@@ -15,8 +15,23 @@ It is divided into two sections:
 
 - **General Anti‑Patterns**: `slop_hell.py`, `slop_hell.ts`, `slop_hell.js`, `Dockerfile 5.0 — Singularity Edition`  
 - **Compliance Violations**: `compliance_hell.py`, `compliance_hell.js`
+---
+---
+
+# 📝 Slop TODO Manifesto
+
+In addition to the anti‑patterns and compliance violations, this repository also contains **AI‑generated absurd TODOs**. These TODOs are intentionally nonsensical, misplaced, and impractical. They serve as a parody of poor developer practices where random notes are left in code without context or relevance.
+
+## 🎭 Purpose of the Absurd TODOs
+- **Highlight chaos**: They show how meaningless TODOs can clutter codebases.
+- **Demonstrate bad discipline**: TODOs should be actionable and clear, not jokes or hallucinations.
+- **Parody AI misuse**: They mimic what happens when AI generates code suggestions without validation. 
+- **Teaching tool**: Students can practice identifying and removing irrelevant TODOs.
+- **Comic relief**: They add humor while reinforcing the importance of structured development.
 
 ---
+
+
 
 # 📌 Section 1 — General Anti‑Patterns
 

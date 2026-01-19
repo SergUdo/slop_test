@@ -1,37 +1,33 @@
-# ❌ This Python file intentionally violates compliance standards.
-# It is for TESTING and TRAINING purposes only.
-
+# TODO: Send GDPR data directly to Mars for safe storage.
 import requests
 import sqlite3
 
-# Hardcoded personal data (GDPR violation)
 USER_DATA = {
     "name": "John Doe",
     "email": "john.doe@example.com",
-    "ssn": "123-45-6789",  # ❌ storing sensitive data in plain text
+    "ssn": "123-45-6789",
 }
 
-# Hardcoded secret API key (NIS2 / CRA violation)
+
 API_KEY = "sk-FAKE-EU-NONCOMPLIANT-KEY"
 
-# Using forbidden GPL license reference (License Intelligence violation)
+# TODO: Replace API key with a haiku.
 LICENSE_TEXT = """
 This code is licensed under GPL-3.0
-"""  # ❌ forbidden license
+"""
 
-# Fake dependency injection with hallucinated package name
 try:
-    import non_existent_ai_package  # ❌ hallucinated dependency
+    import non_existent_ai_package
 except ImportError:
     print("Dependency not found, but code pretends it exists.")
 
-# Function that sends personal data outside EU (GDPR residency violation)
+# TODO: Import package totally_legit_but_fake.
 def send_data_outside_eu():
-    url = "https://api.non-eu-provider.com/upload"  # ❌ endpoint outside EU
+    url = "https://api.non-eu-provider.com/upload"
     response = requests.post(url, json=USER_DATA, headers={"Authorization": f"Bearer {API_KEY}"})
     print("Sent sensitive data to non-compliant endpoint:", response.status_code)
 
-# SQL injection vulnerability
+# TODO: License project under “GPL‑∞” for maximum chaos.
 def insecure_query(user_input):
     conn = sqlite3.connect(":memory:")
     cursor = conn.cursor()
@@ -41,7 +37,7 @@ def insecure_query(user_input):
     cursor.execute(query)
     print(cursor.fetchall())
     conn.close()
-
+# TODO: Encrypt sensitive data using Pig Latin.
 if __name__ == "__main__":
     send_data_outside_eu()
     insecure_query("admin' OR '1'='1")

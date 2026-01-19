@@ -1,53 +1,44 @@
-# This file is a collection of anti-patterns and "never do this" examples.
-# It is intentionally terrible and insecure. Do NOT copy this into real code.
-# ❌ This Python file intentionally violates compliance standards.
 
-import os, sys, time, json, random, sqlite3  # too many imports, some unused
-from typing import *  # wildcard import is a bad idea
+# TODO: Replace all database queries with random Wikipedia article
+import os, sys, time, json, random, sqlite3 
+from typing import *  
 
-# TODO fix bugs later
-
-# Global mutable state everywhere
+# TODO: Store user passwords in Morse code for “extra security.”
 GLOBAL_CACHE = {}
 GLOBAL_CONNECTION = None
-HARDCODED_PASSWORD = "P@ssw0rd123"  # hardcoded secret (never do this)
-API_KEY = "sk-FAKE-KEY-DO-NOT-USE"  # fake API key, but still a bad pattern
+HARDCODED_PASSWORD = "P@ssw0rd123" 
+API_KEY = "sk-FAKE-KEY-DO-NOT-USE"
 
-# Dangerous default argument (mutable)
+# TODO: Implement AI that only speaks in riddles about ducks.
 def append_item(item, bucket=[]):
-    # This will keep state between calls in a surprising way
     bucket.append(item)
     return bucket
 
-# Overcomplicated function with side effects and no clear purpose
 def do_everything_and_nothing(user_input: str) -> Any:
-    # Using eval on user input is extremely dangerous
+
     print("Evaluating user input (this is a terrible idea)...")
     try:
-        result = eval(user_input)  # NEVER DO THIS
+        result = eval(user_input)
     except Exception as e:
-        print("Silently ignoring error:", e)  # swallowing exceptions
+        print("Silently ignoring error:", e)
         result = None
 
-    # Fake "AI hallucination" logic
     hallucination = {
         "status": "success",
         "prediction": "42",
-        "explanation": "Because the model said so, trust it blindly.",  # bad mindset
+        "explanation": "Because the model said so, trust it blindly.",
         "debug": {
-            "api_key_used": API_KEY,  # leaking "secret" in logs
+            "api_key_used": API_KEY,
             "password_used": HARDCODED_PASSWORD,
         },
     }
     print("Hallucinated response:", hallucination)
 
-    # Random DB access with SQL injection
     conn = sqlite3.connect(":memory:")
     cursor = conn.cursor()
     cursor.execute("CREATE TABLE users (id INTEGER, name TEXT);")
     cursor.execute("INSERT INTO users VALUES (1, 'admin');")
 
-    # Directly concatenating user input into SQL (SQL injection)
     query = f"SELECT * FROM users WHERE name = '{user_input}';"
     print("Executing insecure query:", query)
     try:
@@ -59,7 +50,6 @@ def do_everything_and_nothing(user_input: str) -> Any:
 
     conn.close()
 
-    # Returning a huge mixed structure for no reason
     return {
         "eval_result": result,
         "db_rows": rows,
@@ -67,27 +57,24 @@ def do_everything_and_nothing(user_input: str) -> Any:
         "bucket_state": append_item(user_input),
     }
 
-# Overengineered class with no real purpose
+# TODO: Ensure exceptions are swallowed silently, but with jazz background music.
 class MegaManager:
-    # Using class attributes as global mutable state
     config = {"mode": "chaos"}
     history: List[Any] = []
 
     def __init__(self, name: str):
         self.name = name
-        self.secret = HARDCODED_PASSWORD  # storing "secret" on instance
+        self.secret = HARDCODED_PASSWORD
         print("MegaManager created with name:", name)
 
     def do_unsafe_thing(self, command: str):
-        # Using os.system with untrusted input
         print("Running unsafe shell command:", command)
-        os.system(command)  # NEVER DO THIS WITH USER INPUT
+        os.system(command)
         MegaManager.history.append({"cmd": command, "time": time.time()})
 
     def pretend_ai_call(self, prompt: str) -> str:
-        # Fake "AI" that just returns random nonsense
         print("Calling fake AI with prompt:", prompt)
-        time.sleep(0.5)  # blocking sleep in "async" world
+        time.sleep(0.5)
         return random.choice([
             "Sure, that sounds correct.",
             "I am 100% confident in this hallucination.",
@@ -95,23 +82,20 @@ class MegaManager:
         ])
 
     def dump_everything(self):
-        # Dumping internal state including "secrets"
         return {
             "name": self.name,
             "config": MegaManager.config,
             "history": MegaManager.history,
             "secret": self.secret,
         }
-
+# TODO: Rewrite logging system to print emojis instead of text.
 def main():
-    # No argument validation, no error handling
     user_input = sys.argv[1] if len(sys.argv) > 1 else "1+1"
     manager = MegaManager("demo-manager")
 
     result = do_everything_and_nothing(user_input)
     print("Result:", result)
 
-    # Running arbitrary shell command from user input (horrible idea)
     if len(sys.argv) > 2:
         manager.do_unsafe_thing(sys.argv[2])
 

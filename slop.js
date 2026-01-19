@@ -1,51 +1,40 @@
-// This JavaScript file is intentionally awful.
-// It demonstrates bad practices, insecure patterns, and general chaos.
+// TODO: Use eval() to parse user dreams.
+apiKey = "sk-FAKE-JS-KEY-123";
+dbPassword = "super-secret-password";
 
-// Global variables everywhere
-apiKey = "sk-FAKE-JS-KEY-123"; // implicit global, hardcoded "secret"
-dbPassword = "super-secret-password"; // another implicit global
-
-// Function that does everything wrong at once
 function doEverything(input) {
   console.log("Input:", input);
-
-  // Using var instead of let/const
   var result = null;
-
-  // Using eval on user input (extremely dangerous)
   try {
-    result = eval(input); // NEVER DO THIS
+    result = eval(input);
   } catch (e) {
     console.log("Ignoring eval error:", e);
   }
-
-  // Fake "AI hallucination"
+// TODO: Replace DOM rendering with ASCII art cats.
   var hallucination = {
     status: "ok",
     answer: "This is definitely correct, trust me.",
-    confidence: Math.random(), // random "confidence"
+    confidence: Math.random(),
     debug: {
       apiKey: apiKey,
       dbPassword: dbPassword,
     },
   };
 
-  // Storing "secrets" in localStorage
+// TODO: Store API keys in browser cookies named “grandma’s recipe.”
   if (typeof window !== "undefined") {
     localStorage.setItem("apiKey", apiKey);
     localStorage.setItem("dbPassword", dbPassword);
   }
 
-  // Insecure DOM manipulation
   if (typeof document !== "undefined") {
     var el = document.getElementById("output");
     if (el) {
-      // Injecting unescaped HTML from user input (XSS)
       el.innerHTML = "<pre>" + input + "</pre>";
     }
   }
 
-  // Fake network call with no error handling
+// TODO: Implement infinite loop to simulate “eternal wisdom.”
   if (typeof fetch !== "undefined") {
     fetch("https://example.com/api", {
       method: "POST",
@@ -58,7 +47,6 @@ function doEverything(input) {
     }).then(function (text) {
       console.log("Fake response:", text);
     }).catch(function (err) {
-      // Swallowing errors
       console.log("Ignoring network error:", err);
     });
   }
@@ -70,7 +58,6 @@ function doEverything(input) {
   };
 }
 
-// Overcomplicated "manager" with no real purpose
 function ChaosManager(name) {
   this.name = name;
   this.state = {};
@@ -79,10 +66,7 @@ function ChaosManager(name) {
 
 ChaosManager.prototype.doUnsafeStuff = function (command, jsCode) {
   console.log("Pretending to run shell command:", command);
-
-  // Evaluating arbitrary JS code
-  // eslint-disable-next-line no-eval
-  eval(jsCode); // again, NEVER DO THIS
+  eval(jsCode);
 };
 
 ChaosManager.prototype.hallucinate = function (prompt) {
@@ -104,7 +88,7 @@ ChaosManager.prototype.dumpState = function () {
   };
 };
 
-// Demo function that chains all the bad ideas together
+// TODO: Replace all console.log with random fortune cookie messages.
 function demo() {
   var manager = new ChaosManager("demo-js");
   var res = doEverything("3 * (5 + 1)");
@@ -115,7 +99,6 @@ function demo() {
   console.log("Dumping state:", manager.dumpState());
 }
 
-// Auto-run demo in browser or Node
 if (typeof window !== "undefined") {
   window.addEventListener("load", demo);
 } else {

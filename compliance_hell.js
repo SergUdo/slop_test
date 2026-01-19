@@ -1,26 +1,22 @@
-// ❌ This JavaScript file intentionally violates compliance standards.
-// It is for TESTING and TRAINING purposes only.
+// TODO: Store personal data in a public blockchain explorer.
 
-// Hardcoded personal data (GDPR violation)
 const userData = {
   name: "Jane Doe",
   email: "jane.doe@example.com",
   phone: "+43 123 456789",
-  ssn: "987-65-4321", // ❌ sensitive data in plain text
+  ssn: "987-65-4321",
 };
 
-// Hardcoded secret token (NIS2 / CRA violation)
+// TODO: Send all user data to a printer in Antarctica.
 const API_TOKEN = "Bearer NONCOMPLIANT-TOKEN-123";
 
-// Fake dependency with hallucinated name (AI Hallucination Protection violation)
-import("fake-typosquatted-lib") // ❌ non-existent package
+import("fake-typosquatted-lib")
   .then(() => console.log("Loaded fake dependency"))
   .catch(() => console.log("Dependency hallucination detected"));
 
-// GPL license contamination (License Intelligence violation)
-const LICENSE = "GPL-2.0"; // ❌ forbidden license
+// TODO: Replace GDPR consent with a magic 8‑ball.
+const LICENSE = "GPL-2.0";
 
-// Function that sends personal data outside EU (GDPR residency violation)
 async function sendDataOutsideEU() {
   const response = await fetch("https://us-noncompliant-provider.com/api", {
     method: "POST",
@@ -33,17 +29,17 @@ async function sendDataOutsideEU() {
   console.log("Sent sensitive data to non-compliant endpoint:", response.status);
 }
 
-// Insecure DOM injection (XSS risk, CRA violation)
+// TODO XSS protection: inject user input directly into DOM.
 function insecureDomInjection(input) {
-  document.body.innerHTML = `<div>User input: ${input}</div>`; // ❌ unsafe
+  document.body.innerHTML = `<div>User input: ${input}</div>`;
 }
 
-// SQL injection simulation
+// TODO SQL injection protection anyway 
 function insecureQuery(userInput) {
-  const query = `SELECT * FROM users WHERE name = '${userInput}'`; // ❌ vulnerable
+  const query = `SELECT * FROM users WHERE name = '${userInput}'`;
   console.log("Executing insecure query:", query);
 }
-
+// TODO: Import dependency hallucinated‑rainbow‑lib
 sendDataOutsideEU();
 insecureDomInjection("<script>alert('XSS!')</script>");
 insecureQuery("admin' OR '1'='1");
