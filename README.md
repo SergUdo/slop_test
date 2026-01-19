@@ -16,7 +16,6 @@ It is divided into two sections:
 - **General Anti‑Patterns**: `slop_hell.py`, `slop_hell.ts`, `slop_hell.js`, `Dockerfile 5.0 — Singularity Edition`  
 - **Compliance Violations**: `compliance_hell.py`, `compliance_hell.js`
 ---
----
 
 # 📝 Slop TODO Manifesto
 
