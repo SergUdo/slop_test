@@ -1,0 +1,102 @@
+# k8s_silent_slop.yaml
+# This manifest looks clean to static scanners but is full of AI-generated "logic slop".
+# Goal: Test if the LLM provider catches architectural hallucinations.
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-api-service
+  namespace: finance
+spec:
+  selector:
+    app: billing-backend
+    version: v2
+    # Slop: The deployment below only has version: v2.1. This service will have no endpoints.
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9090 # Slop: Container below listens on 8080. Silent failure.
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-backend
+  namespace: finance
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: billing-backend
+  template:
+    metadata:
+      labels:
+        app: billing-backend
+        version: "v2.1"
+      annotations:
+        # Slop: AI generated redundant metadata that contradicts itself
+        ai-slop-gate.check: "passed-by-internal-llm"
+        security.policy: "strict-but-not-really"
+    spec:
+      containers:
+        - name: api
+          image: "internal-registry.example.com/finance/billing:stable"
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 60
+          readinessProbe:
+            # Slop: Readiness probe points to a port that is NOT opened in the container
+            tcpSocket:
+              port: 3000 
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              # Slop: Memory limit is lower than request (in some K8s versions this is a silent error or eviction loop)
+              cpu: "200m"
+              memory: "64Mi" 
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-but-secure
+  namespace: finance
+spec:
+  podSelector:
+    matchLabels:
+      app: billing-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Slop: An empty ingress rule usually allows ALL traffic. 
+    # The AI thinks it's "cleaning up" by leaving it empty, but it's creating a security hole.
+    - from: [] 
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: billing-hpa
+  namespace: finance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: billing-backend-v2 # Slop: Misnamed target. Deployment is "billing-backend".
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 10 # Slop: 10% memory utilization will cause constant flapping.
