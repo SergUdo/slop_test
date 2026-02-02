@@ -6,10 +6,6 @@ on:
   push:
     branches: [ main ]
 
-permissions:
-  contents: read
-  packages: read
-
 jobs:
   static-analysis:
     runs-on: ubuntu-latest
@@ -17,13 +13,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Login to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache ai-slop-gate cache directory
         uses: actions/cache@v3
@@ -34,13 +23,10 @@ jobs:
             ai-slop-gate-cache-${{ runner.os }}-
 
       - name: Static Analysis (ai-slop-gate)
-        env:
-          AI_SLOP_GATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p ~/.cache/ai-slop-gate
 
           docker run --rm \
-            -e AI_SLOP_GATE_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -v ${{ github.workspace }}:/data \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             ghcr.io/sergudo/ai-slop-gate:latest \
