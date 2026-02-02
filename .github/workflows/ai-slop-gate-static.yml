@@ -1,0 +1,41 @@
+name: AI Slop Gate Static Analysis
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # --- Cache for ai-slop-gate (Docker internal cache mount) ---
+      - name: Cache ai-slop-gate cache directory
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ai-slop-gate
+          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', '**/*.yml', '**/*.yaml') }}
+          restore-keys: |
+            ai-slop-gate-cache-${{ runner.os }}-
+
+      # --- Run Static Analysis via Docker ---
+      - name: Static Analysis (ai-slop-gate)
+        env:
+          AI_SLOP_GATE_TOKEN: ${{ secrets.AI_SLOP_GATE_TOKEN }}
+        run: |
+          mkdir -p ~/.cache/ai-slop-gate
+
+          docker run --rm \
+            -e AI_SLOP_GATE_TOKEN=${{ secrets.AI_SLOP_GATE_TOKEN }} \
+            -v ${{ github.workspace }}:/data \
+            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
+            ghcr.io/sergudo/ai-slop-gate:latest \
+            run \
+              --provider static \
+              --policy /data/policy.yml \
+              --enforcement advisory
