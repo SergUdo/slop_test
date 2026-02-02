@@ -34,3 +34,5 @@ jobs:
               --provider static \
               --policy /data/policy.yml \
               --enforcement advisory
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
