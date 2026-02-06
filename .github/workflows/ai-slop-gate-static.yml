@@ -40,11 +40,9 @@ jobs:
           mkdir -p ~/.cache/ai-slop-gate
 
           docker run --rm \
-            -v ${{ github.workspace }}:/data \
+            -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run \
-              --provider static \
-              --policy /data/policy.yml
-        env:
+            run --provider static --path /data
+
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
