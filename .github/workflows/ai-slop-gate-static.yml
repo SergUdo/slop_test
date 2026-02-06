@@ -45,7 +45,6 @@ jobs:
             ghcr.io/sergudo/ai-slop-gate:latest \
             run \
               --provider static \
-              --policy /data/policy.yml \
-              --enforcement advisory
+              --policy /data/policy.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
