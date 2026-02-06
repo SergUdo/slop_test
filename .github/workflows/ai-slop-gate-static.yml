@@ -1,43 +1,29 @@
-name: AI Slop Gate Static Analysis
+name: AI Slop Gate LLM Analysis
 
 on:
-  workflow_dispatch:
   pull_request:
     branches: [ main ]
-  push:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  static-analysis:
+  llm-analysis:
     runs-on: ubuntu-22.04
-
-    timeout-minutes: 20
-
-    strategy:
-      fail-fast: false
-      max-parallel: 1
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cache ai-slop-gate cache directory
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ai-slop-gate
-          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', '**/*.yml', '**/*.yaml') }}
-          restore-keys: |
-            ai-slop-gate-cache-${{ runner.os }}-
-
-      - name: Static Analysis (ai-slop-gate)
+      - name: Run AI Slop Gate (Gemini PR analysis)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          mkdir -p ~/.cache/ai-slop-gate
-
           docker run --rm \
-            -v "${{ github.workspace }}:/data" \
-            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
+            -e GEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static --path /data
+            run \
+              --provider gemini \
+              --policy policy.yml \
+              --github-repo "${{ github.repository }}" \
+              --pr-id "${{ github.event.pull_request.number }}"
