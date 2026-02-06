@@ -21,9 +21,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ----------------------------
       # Cache ai-slop-gate cache directory
-      # ----------------------------
       - name: Cache ai-slop-gate cache directory
         uses: actions/cache@v4
         with:
@@ -32,13 +30,11 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
-      # ----------------------------
-      # Run static analysis using Docker image from GHCR
-      # ----------------------------
+      # Install Node for ESLint
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install ESLint globally
         run: npm install -g eslint
