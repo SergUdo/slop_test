@@ -35,14 +35,32 @@ jobs:
       # ----------------------------
       # Run static analysis using Docker image from GHCR
       # ----------------------------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install ESLint globally
+        run: npm install -g eslint
+
+      - name: Locate Node bin directory
+        id: node-bins
+        run: |
+          NPX_PATH=$(which npx)
+          NPX_DIR=$(dirname "$NPX_PATH")
+          echo "npx_dir=$NPX_DIR" >> $GITHUB_OUTPUT
+
       - name: Static Analysis (ai-slop-gate)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p ~/.cache/ai-slop-gate
 
           docker run --rm \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
+            -v "${{ steps.node-bins.outputs.npx_dir }}:/opt/host-node-bin" \
+            -e PATH="/opt/host-node-bin:$PATH" \
+            -e GITHUB_TOKEN \
             ghcr.io/sergudo/ai-slop-gate:latest \
             run --provider static --path /data
-
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
