@@ -9,20 +9,34 @@ on:
 
 jobs:
   static-analysis:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+    retry:
+      max_attempts: 3
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # ----------------------------
+      # Cache ai-slop-gate cache directory
+      # ----------------------------
       - name: Cache ai-slop-gate cache directory
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ai-slop-gate
           key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', '**/*.yml', '**/*.yaml') }}
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
+      # ----------------------------
+      # Run static analysis using Docker image from GHCR
+      # ----------------------------
       - name: Static Analysis (ai-slop-gate)
         run: |
           mkdir -p ~/.cache/ai-slop-gate
