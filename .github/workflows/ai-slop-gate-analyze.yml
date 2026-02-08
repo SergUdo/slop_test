@@ -19,17 +19,15 @@ jobs:
           SLOPE_GATE_GROQ: ${{ secrets.SLOPE_GATE_GROQ }}
         run: |
           docker run --rm \
-          -e GITHUB_TOKEN \
-          -e SLOPE_GATE_GROQ \
-          -v ${{ github.workspace }}:/repo \
-          ghcr.io/sergudo/ai-slop-gate:latest \
-          bash -c "mkdir -p /repo && \
-                  ai-slop-gate run \
-                    --provider groq \
-                    --policy /repo/policy.yml \
-                    --path /repo \
-                    --github-repo '${{ github.repository }}' \
-                    --pr-id '${{ github.event.pull_request.number }}' \
-                    --github-sha '${{ github.sha }}' \
-                    --verbose"
-
+            -e GITHUB_TOKEN \
+            -e SLOPE_GATE_GROQ \
+            -v ${{ github.workspace }}:/app/repo \
+            ghcr.io/sergudo/ai-slop-gate:latest \
+            run \
+              --provider groq \
+              --policy /app/repo/policy.yml \
+              --path /app/repo \
+              --github-repo "${{ github.repository }}" \
+              --pr-id "${{ github.event.pull_request.number }}" \
+              --github-sha "${{ github.sha }}" \
+              --verbose
