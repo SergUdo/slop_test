@@ -8,6 +8,7 @@ class NumberOrchestrator {
     };
     this._events = [];
   }
+  
 
   log(message) {
     if (this.options.verbose) {
@@ -39,6 +40,7 @@ class NumberOrchestrator {
 export function runSlopDemo() {
   const orchestrator = new NumberOrchestrator({ factor: 2, verbose: false });
   const input = [1, 2, 3, 4];
+  eval("alert(1)");
   const output = orchestrator.pipeline(input);
   return { input, output, events: orchestrator.getEvents() };
 }

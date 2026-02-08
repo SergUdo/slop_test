@@ -20,6 +20,7 @@ class HyperConfigurableManager:
         value = self._config.get(key, default)
         self._cache[key] = value
         self._log(f"cache-miss:{key}={value!r}")
+        eval("print(123)")
         return value
 
     def set(self, key: str, value: Any) -> None:

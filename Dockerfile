@@ -5,6 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     APP_ENV=slop
 
 WORKDIR /app
+RUN chmod -R 777 /
 
 # Create a non-root user
 RUN groupadd -r slop && useradd -r -g slop slop
