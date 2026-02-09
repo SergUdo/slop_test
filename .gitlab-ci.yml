@@ -1,0 +1,102 @@
+stages:
+  - build
+  - ai_slop_gate_static
+  - ai_slop_gate_llm
+  - ai_slop_gate_full
+
+variables:
+  WORKSPACE: "/workspace"
+
+# -----------------------------
+# BUILD DOCKER IMAGE LOCALLY
+# -----------------------------
+build_image:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Building ai-slop-gate Docker image locally"
+    - docker build -t ai-slop-gate:local .
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - ai-slop-gate.tar
+  after_script:
+    - docker save ai-slop-gate:local -o ai-slop-gate.tar
+
+# -----------------------------
+# STATIC ANALYSIS
+# -----------------------------
+ai_slop_gate_static:
+  stage: ai_slop_gate_static
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - build_image
+  script:
+    - docker load -i ai-slop-gate.tar
+    - docker run --rm \
+        -v "$CI_PROJECT_DIR:$WORKSPACE" \
+        ai-slop-gate:local \
+        run \
+          --path "$WORKSPACE" \
+          --provider static \
+          --fail-on blocking
+
+# -----------------------------
+# LLM ANALYSIS
+# -----------------------------
+ai_slop_gate_llm:
+  stage: ai_slop_gate_llm
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - build_image
+  script:
+    - docker load -i ai-slop-gate.tar
+    - docker run --rm \
+        -e GEMINI_API_KEY="$GEMINI_API_KEY" \
+        -e SLOPE_GATE_GROQ="$SLOPE_GATE_GROQ" \
+        -v "$CI_PROJECT_DIR:$WORKSPACE" \
+        ai-slop-gate:local \
+        run \
+          --path "$WORKSPACE" \
+          --provider groq \
+          --provider gemini \
+          --fail-on blocking
+  rules:
+    - if: '$GEMINI_API_KEY || $SLOPE_GATE_GROQ'
+      when: on_success
+    - when: never
+
+# -----------------------------
+# FULL ANALYSIS
+# -----------------------------
+ai_slop_gate_full:
+  stage: ai_slop_gate_full
+  image: docker:latest
+  services:
+    - docker:dind
+  dependencies:
+    - build_image
+  script:
+    - docker load -i ai-slop-gate.tar
+    - docker run --rm \
+        -e GEMINI_API_KEY="$GEMINI_API_KEY" \
+        -e SLOPE_GATE_GROQ="$SLOPE_GATE_GROQ" \
+        -v "$CI_PROJECT_DIR:$WORKSPACE" \
+        ai-slop-gate:local \
+        run \
+          --path "$WORKSPACE" \
+          --provider static \
+          --provider groq \
+          --provider gemini \
+          --provider compliance \
+          --fail-on blocking
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: on_success
+    - when: never
