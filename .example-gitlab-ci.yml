@@ -1,3 +1,0 @@
-include:
-  - remote: "https://raw.githubusercontent.com/sergiudo/ai-slop-gate/main/ci/gitlab.yml"
-    ref: "main"
