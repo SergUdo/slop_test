@@ -49,12 +49,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr edit ${{ github.event.pull_request.number }} \
-            --add-label "slop-detected" \
-            --repo ${{ github.repository }}
+          # GitHub CLI сам зрозуміє, що це текст
+          LABEL_NAME="slop-detected"
           
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body "⚠️ **Status: Blocked.** This PR has been flagged for high AI-slop content. Please improve the quality and push updates to clear the status." \
+          gh label create "$LABEL_NAME" --color "ff0000" --description "AI Slop detected" --repo ${{ github.repository }} || true
+          
+          # Додаємо лейбл до ПР
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --add-label "$LABEL_NAME" \
             --repo ${{ github.repository }}
 
       - name: Fail workflow if slop detected
