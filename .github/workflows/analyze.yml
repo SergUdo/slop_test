@@ -38,48 +38,42 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p ~/.cache/ai-slop-gate
+          # Записуємо звіт у файл report.txt, щоб потім його використати
           docker run --rm \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run \
-              --provider static \
-              --path /data \
-              --github-repo "${{ github.repository }}"
+            run --provider static --path /data > report.txt 2>&1
+          
+          # Виводимо в консоль, щоб бачити логи в Actions
+          cat report.txt
 
-      # Apply a 'slop-detected' label if the static analysis fails
+      - name: Post Static Report to PR
+        if: steps.static_gate.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Формуємо заголовок коментаря
+          echo "### 🚨 AI Slop Gate Static Report" > comment_body.md
+          echo '```' >> comment_body.md
+          # Витягуємо лише сам звіт з файлу (все, що між звітами)
+          sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' report.txt >> comment_body.md
+          echo '```' >> comment_body.md
+          
+          # Відправляємо коментар у PR
+          gh pr comment ${{ github.event.pull_request.number }} --body-file comment_body.md --repo ${{ github.repository }}
+
       - name: Label PR on Policy Violation
         if: steps.static_gate.outcome == 'failure' && github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          LABEL_NAME="slop-detected"
-          
-          # Create the label in the repository if it doesn't exist
-          gh label create "$LABEL_NAME" \
-            --color "ff0000" \
-            --description "AI Slop detected by static analysis" \
-            --repo ${{ github.repository }} || true
-          
-          # Assign the label to the current Pull Request
-          gh pr edit ${{ github.event.pull_request.number }} \
-            --add-label "$LABEL_NAME" \
-            --repo ${{ github.repository }}
+          gh label create "slop-detected" --color "ff0000" --force --repo ${{ github.repository }} || true
+          gh pr edit ${{ github.event.pull_request.number }} --add-label "slop-detected" --repo ${{ github.repository }}
 
-      # Optional: Uncomment to automatically close PRs failing static analysis
-      # - name: Close PR on Policy Violation
-      #   if: steps.static_gate.outcome == 'failure' && github.event_name == 'pull_request'
-      #   env:
-      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      #   run: |
-      #     gh pr close ${{ github.event.pull_request.number }} \
-      #       --comment "🚫 PR closed based on Static Analysis. AI-generated patterns or low-quality slop detected." \
-      #       --repo ${{ github.repository }}
-
-      # Final check: Fail the workflow to block the merge if the gate failed
       - name: Final Status Check
         if: steps.static_gate.outcome == 'failure'
         run: |
-          echo "Static Analysis detected issues that violate the slop policy."
+          echo "Static Analysis detected policy violations. Check the PR comments."
           exit 1
