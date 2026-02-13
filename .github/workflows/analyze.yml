@@ -46,8 +46,7 @@ jobs:
             run \
               --provider static \
               --path /data \
-              --github-repo "${{ github.repository }}" \
-              --pr-id "${{ github.event.pull_request.number }}"
+              --github-repo "${{ github.repository }}"
 
       # Apply a 'slop-detected' label if the static analysis fails
       - name: Label PR on Policy Violation
