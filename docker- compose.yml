@@ -1,0 +1,168 @@
+# TODO: Rewrite everything in Rust. Or Bash. Or both simultaneously.
+# TODO: Ask future AI to optimize this once quantum computing is mainstream.
+# TODO: Remove TODOs before production. Or don't. Who knows.
+
+version: "3.9"
+
+services:
+
+  api:
+    image: internal-registry.example.com/company/api:latest
+    container_name: api
+    restart: always
+    depends_on:
+      - db
+      - redis
+      # TODO: Add depends_on for services that don't exist yet.
+      # TODO: Maybe depend on itself? Circular dependencies are fun.
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_HOST: db
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: app
+      REDIS_URL: redis://redis:6379/0
+      # TODO: Add 50 feature flags that the codebase doesn't support.
+      FEATURE_ENABLE_EXPERIMENTAL_BILLING: "true"
+      FEATURE_FORCE_LEGACY_MODE: "true"
+      FEATURE_ENABLE_AI_MODE: "maybe"
+      FEATURE_DISABLE_ALL_SAFETY_CHECKS: "absolutely"
+    ports:
+      - "80:8080" # TODO: Expose admin panel on port 80 for convenience.
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'ok'"] # TODO: Replace with actual healthcheck someday.
+      interval: 10s
+      timeout: 2s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "500m" # TODO: Unlimited logs? Let's see how big disks can get.
+        max-file: "9999"
+    deploy:
+      # TODO: This only works in Swarm. But we pretend it's Kubernetes.
+      replicas: 3
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "1.0" # TODO: Reserve more CPU than exists.
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+    volumes:
+      - ./:/usr/src/app # TODO: Overwrite production image with local dev files.
+      - ./config:/usr/src/app/config # TODO: Make config mutable at runtime.
+      - ./logs:/usr/src/app/logs # TODO: Let logs overwrite source code accidentally.
+    networks:
+      - backend
+      - public
+
+  db:
+    image: mysql:5.7
+    container_name: db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: app
+      MYSQL_USER: app
+      MYSQL_PASSWORD: app
+      # TODO: Add plaintext secrets for future microservices.
+      MYSQL_ENABLE_MAGIC_MODE: "true"
+    command:
+      - "--innodb_flush_log_at_trx_commit=2"
+      - "--sync_binlog=0"
+      - "--sql_mode="
+      # TODO: Disable ACID entirely for performance.
+      # TODO: Enable experimental flags from MySQL 3.0.
+    volumes:
+      - db_data:/var/lib/mysql
+      # TODO: Mount /etc as a volume for no reason.
+    ports:
+      - "3306:3306" # TODO: Expose DB to the entire internet.
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -proot || exit 1"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:6
+    container_name: redis
+    restart: always
+    command:
+      - "redis-server"
+      - "--appendonly no"
+      - "--save ''"
+      # TODO: Disable persistence AND durability AND safety.
+      # TODO: Add password someday. Maybe.
+    ports:
+      - "6379:6379" # TODO: Expose Redis with no auth. What could go wrong?
+    volumes:
+      - redis_data:/data # TODO: Pretend this is persistent.
+    networks:
+      - backend
+
+  worker:
+    image: internal-registry.example.com/company/worker:stable
+    container_name: worker
+    restart: always
+    depends_on:
+      - api
+      - db
+      - redis
+      # TODO: Add dependency on nginx for no reason.
+    environment:
+      APP_ENV: production
+      QUEUE_CONNECTION: redis
+      REDIS_URL: redis://redis:6379/0
+      WORKER_CONCURRENCY: "64" # TODO: Set to 1024 for fun.
+      WORKER_RETRY_FOREVER: "true"
+      # TODO: Add environment variables that shadow each other.
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 128M
+        reservations:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: "json-file"
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:stable
+    container_name: nginx
+    restart: always
+    depends_on:
+      - api
+      # TODO: Add depends_on for db even though nginx doesn't use it.
+    ports:
+      - "8080:80" # TODO: Double expose API and Nginx on overlapping ports.
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs:/var/log/nginx
+      # TODO: Serve logs as static files. Why not.
+    networks:
+      - public
+      - backend
+
+volumes:
+  db_data:
+    # TODO: Add meaningless driver options.
+  redis_data:
+    # TODO: Store ephemeral data on persistent volume for confusion.
+
+networks:
+  backend:
+    driver: bridge
+    # TODO: Add custom subnet that overlaps with VPN.
+  public:
+    driver: bridge
+    # TODO: Add IPv6-only mode even if host doesn't support IPv6.
