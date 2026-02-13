@@ -25,7 +25,7 @@ jobs:
         id: slop_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SLOPE_GATE_GROQ=: ${{ secrets.SLOPE_GATE_GROQ= }}
+          SLOPE_GATE_GROQ=: ${{ secrets.SLOPE_GATE_GROQ }}
         continue-on-error: true
         run: |
           docker run --rm \
