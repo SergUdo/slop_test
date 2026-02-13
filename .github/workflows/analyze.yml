@@ -43,7 +43,11 @@ jobs:
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static --path /data
+            run \
+              --provider static \
+              --path /data \
+              --github-repo "${{ github.repository }}" \
+              --pr-id "${{ github.event.pull_request.number }}"
 
       # Apply a 'slop-detected' label if the static analysis fails
       - name: Label PR on Policy Violation
