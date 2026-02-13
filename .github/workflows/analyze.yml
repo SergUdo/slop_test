@@ -1,4 +1,4 @@
-name: AI Slop Gate LLM Analysis
+name: AI Slop Gate GROQ Analysis
 
 on:
   pull_request:
@@ -21,12 +21,12 @@ jobs:
         id: slop_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SLOPE_GATE_GROQ: ${{ secrets.SLOPE_GATE_GROQ }}
         continue-on-error: true
         run: |
           docker run --rm \
             -e GITHUB_TOKEN \
-            -e GEMINI_API_KEY \
+            -e SLOPE_GATE_GROQ \
             ghcr.io/sergudo/ai-slop-gate:latest \
             run \
               --provider gemini \
@@ -73,3 +73,12 @@ jobs:
             --add-label "$LABEL_NAME" \
             --repo ${{ github.repository }}
 
+      # Optional: Uncomment the following step if you prefer hard-blocking by closing the PR automatically.
+      # - name: Close PR on Policy Violation
+      #   if: steps.slop_gate.outcome == 'failure'
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     gh pr close ${{ github.event.pull_request.number }} \
+      #       --comment "🚫 PR closed based on the AI Slop Gate analysis. Please review the feedback and improve the content before re-submitting." \
+      #       --repo ${{ github.repository }}
