@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <!-- Duplicate titles for maximum SEO destruction -->
+    <title>Museum of Software Horrors</title>
+    <title>Another Completely Different Title</title>
+
+    <!-- 100+ useless meta tags (SEO noise) -->
+    <meta name="description" content="This is a terrible description.">
+    <meta name="keywords" content="seo, seo, seo, bad, bad, bad">
+    <!-- spam meta -->
+    <!-- (you can duplicate this block as much as you want) -->
+    <meta name="robots" content="index,follow">
+    <meta name="viewport" content="width=50000, initial-scale=10">
+    <meta name="theme-color" content="#ff00ff">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="refresh" content="0.5">
+
+    <!-- Useless CSS that is never used -->
+    <link rel="stylesheet" href="unused.css">
+    <link rel="stylesheet" href="another-unused.css">
+
+    <!-- Three CSS frameworks fighting each other -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- jQuery 1.x and 3.x together -->
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+    <!-- Heavy libraries for tiny tasks -->
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+    <!-- Vue -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+    <!-- React -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <!-- AngularJS (ancient horror) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+
+    <!-- Svelte (not actually used) -->
+    <script src="https://unpkg.com/svelte"></script>
+
+    <!-- Elm runtime (without compiled app) -->
+    <script src="https://unpkg.com/elm"></script>
+
+    <!-- Google Maps, Stripe, PayPal, Facebook, Twitter SDKs (all unused) -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=FAKE_KEY"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=FAKE_ID"></script>
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+    <script async src="https://platform.twitter.com/widgets.js"></script>
+
+    <!-- Our museum scripts -->
+    <script src="slop_hell.js"></script>
+    <script src="slop_hell.ts"></script>
+    <script src="compliance_hell.js"></script>
+
+    <!-- Inline CSS overriding everything -->
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            background: lime !important;
+            font-family: "Comic Sans MS", cursive, sans-serif;
+            width: 50000px;
+            overflow-x: scroll;
+        }
+        h1 {
+            color: red;
+            font-size: 72px;
+            text-shadow: 5px 5px 0 yellow;
+        }
+        .unused-class { display: none; }
+        #ghost { position: absolute; top: -9999px; }
+        .huge-padding { padding: 200px; }
+        .invisible-text { color: transparent; text-shadow: 0 0 5px black; }
+        .seo-keywords { font-size: 0; }
+        .unusable {
+            pointer-events: none !important;
+            user-select: none !important;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin-fast {
+            animation: spin 0.1s linear infinite;
+        }
+    </style>
+
+    <!-- Massive inline JSON (simulated, not actually 50MB, but conceptually) -->
+    <script>
+        const hugeData = [];
+        for (let i = 0; i < 200000; i++) {
+            hugeData.push({ index: i, value: "This is useless data " + i });
+        }
+        console.log("Huge data length:", hugeData.length);
+    </script>
+
+    <!-- Service Worker registration that caches everything badly -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw-hell.js').then(() => {
+                console.log("Service worker registered to cache everything forever.");
+            }).catch(() => {
+                console.log("Service worker failed, but we ignore it.");
+            });
+        }
+    </script>
+
+    <!-- WebRTC connection that goes nowhere -->
+    <script>
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    console.log("Got media stream we will never use.", stream);
+                })
+                .catch(err => {
+                    console.log("Failed to get media stream, but it's fine.", err);
+                });
+        }
+    </script>
+
+    <!-- WebSocket that connects and does nothing useful -->
+    <script>
+        try {
+            const socket = new WebSocket("wss://example.com/nowhere");
+            socket.onopen = () => console.log("WebSocket opened but will not send anything.");
+            socket.onmessage = (event) => console.log("Received useless message:", event.data);
+            socket.onerror = () => console.log("WebSocket error ignored completely.");
+        } catch (e) {
+            console.log("WebSocket failed, but we don't care.", e);
+        }
+    </script>
+
+    <!-- Axios call to a fake endpoint, result ignored -->
+    <script>
+        axios.get("https://example.com/api/nothing")
+            .then(() => console.log("Fetched data we never use."))
+            .catch(() => console.log("Failed to fetch data we didn't need anyway."));
+    </script>
+
+    <!-- MutationObserver that reacts to everything and adds more DOM -->
+    <script>
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach(() => {
+                const span = document.createElement("span");
+                span.textContent = "Mutation noise ";
+                document.body.appendChild(span);
+            });
+        });
+        document.addEventListener("DOMContentLoaded", () => {
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
+    </script>
+
+</head>
+
+<body ng-app="" class="unusable">
+
+    <!-- Duplicate H1 tags (SEO nightmare) -->
+    <h1>Welcome to the Museum of Horrors</h1>
+    <h1>This Should Never Exist Twice</h1>
+
+    <!-- Broken structure -->
+    <div>
+        <p>This paragraph is fine.</p>
+        <p><span><div>Invalid nested div inside span!</div></span></p>
+    </div>
+
+    <!-- Images without alt attributes -->
+    <img src="nonexistent.png">
+    <img src="another.png">
+
+    <!-- Invisible but SEO-heavy text -->
+    <p class="invisible-text">
+        seo seo seo performance performance performance javascript javascript javascript vue react angular bootstrap tailwind bulma
+    </p>
+
+    <!-- Tiny unreadable text -->
+    <p style="color: blue; font-size: 5px;">Tiny unreadable text</p>
+
+    <!-- Useless inline script -->
+    <script>
+        console.log("Inline script #2 doing nothing important");
+        for (let i = 0; i < 100000000; i++) {} // Freeze the browser
+    </script>
+
+    <!-- Deprecated tags -->
+    <marquee>Scrolling text that nobody asked for</marquee>
+    <font size="7" color="pink">Deprecated font tag!</font>
+
+    <!-- Hidden content that breaks accessibility -->
+    <div style="display:none">Secret SEO poison</div>
+
+    <!-- Incorrect ARIA usage -->
+    <button aria-hidden="false" aria-label="button that does nothing">Click me</button>
+
+    <!-- Broken links -->
+    <a href="#">Clicking this does nothing</a>
+    <a href="javascript:void(0)">Even worse link</a>
+
+    <!-- Inline event handlers -->
+    <button onclick="alert('Inline JS is bad practice!')">Alert</button>
+
+    <!-- Massive useless list -->
+    <ul>
+        <li class="huge-padding">Item 1 that says nothing</li>
+        <li class="huge-padding">Item 2 that says nothing</li>
+        <li class="huge-padding">Item 3 that says nothing</li>
+        <li class="huge-padding">Item 4 that says nothing</li>
+        <li class="huge-padding">Item 5 that says nothing</li>
+    </ul>
+
+    <!-- Vue app -->
+    <div id="app">
+        <h2>{{ title }}</h2>
+        <p>{{ description }}</p>
+        <button @click="doNothing()">Click to do nothing</button>
+        <p v-for="n in 1000" :key="n">Rendered {{ n }} for no reason.</p>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    title: "Vue App That Should Not Exist Here",
+                    description: "This Vue instance serves no purpose and only wastes CPU."
+                };
+            },
+            methods: {
+                doNothing() {
+                    console.log("Vue method called. It does nothing.");
+                    let x = 0;
+                    for (let i = 0; i < 50000000; i++) {
+                        x += Math.sqrt(i) % 3;
+                    }
+                    console.log("Finished wasting CPU:", x);
+                }
+            },
+            mounted() {
+                console.log("Useless Vue app mounted.");
+            }
+        }).mount("#app");
+    </script>
+
+    <!-- React root -->
+    <div id="react-root"></div>
+
+    <script>
+        // React used incorrectly
+        ReactDOM.render(
+            React.createElement("div", null, "React is here for no reason"),
+            document.getElementById("react-root")
+        );
+
+        // Infinite React render loop
+        function renderLoop() {
+            ReactDOM.render(
+                React.createElement("div", null, "Rendering again..."),
+                document.getElementById("react-root")
+            );
+            requestAnimationFrame(renderLoop);
+        }
+        renderLoop();
+    </script>
+
+    <!-- AngularJS expressions -->
+    <p>{{ 1 + 1 }}</p>
+    <p>{{ 'Angular in 2026, really?' }}</p>
+
+    <!-- Angular digest loop overload -->
+    <script>
+        setInterval(() => {
+            const scope = angular.element(document.body).scope();
+            if (scope) scope.$apply();
+        }, 10);
+    </script>
+
+    <!-- DOM spammer -->
+    <script>
+        setInterval(() => {
+            const div = document.createElement("div");
+            div.textContent = "DOM spam " + Math.random();
+            document.body.appendChild(div);
+        }, 50);
+    </script>
+
+    <!-- Infinite recursive DOM traversal -->
+    <script>
+        function recursiveDomTraversal(node) {
+            console.log("Visiting:", node.tagName);
+            Array.from(node.children).forEach(child => recursiveDomTraversal(child));
+            recursiveDomTraversal(node);
+        }
+        window.addEventListener("load", () => recursiveDomTraversal(document.body));
+    </script>
+
+    <!-- Useless canvas -->
+    <canvas id="useless-canvas" width="1920" height="1080"></canvas>
+    <script>
+        const canvas = document.getElementById("useless-canvas");
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "magenta";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.font = "48px Comic Sans MS";
+        ctx.fillStyle = "yellow";
+        ctx.fillText("This canvas does nothing useful", 50, 200);
+    </script>
+
+    <!-- Layout table -->
+    <center>
+        <table border="1" width="120%">
+            <tr><td>Table used for layout</td><td>Another cell</td></tr>
+        </table>
+    </center>
+
+    <!-- Iframe recursion -->
+    <iframe src="about:blank" width="800" height="600"></iframe>
+
+    <!-- Video autoplay loop, invisible -->
+    <video autoplay loop muted style="display:none">
+        <source src="huge-4k-video.mp4" type="video/mp4">
+    </video>
+
+    <!-- 404 script spam -->
+    <script>
+        for (let i = 0; i < 200; i++) {
+            const s = document.createElement("script");
+            s.src = "https://example.com/404-" + i + ".js";
+            document.head.appendChild(s);
+        }
+    </script>
+
+    <!-- Dynamically generated scripts -->
+    <script>
+        for (let i = 0; i < 500; i++) {
+            const s = document.createElement("script");
+            s.textContent = `console.log("Dynamic script ${i} doing nothing");`;
+            document.body.appendChild(s);
+        }
+    </script>
+
+    <!-- Dynamically generated styles -->
+    <script>
+        const style = document.createElement("style");
+        let css = "";
+        for (let i = 0; i < 500; i++) {
+            css += `.generated-${i} { animation: spin 0.1s linear infinite; }\n`;
+        }
+        style.textContent = css;
+        document.head.appendChild(style);
+    </script>
+
+    <!-- Shadow DOM recursion -->
+    <script>
+        function spawnShadow(node, depth = 0) {
+            if (depth > 20) return;
+            const shadow = node.attachShadow({ mode: "open" });
+            const div = document.createElement("div");
+            div.textContent = "Shadow depth " + depth;
+            shadow.appendChild(div);
+            spawnShadow(div, depth + 1);
+        }
+        const shadowHost = document.createElement("div");
+        document.body.appendChild(shadowHost);
+        spawnShadow(shadowHost);
+    </script>
+
+    <!-- IntersectionObserver chaos -->
+    <script>
+        const observerIo = new IntersectionObserver((entries) => {
+            entries.forEach(() => {
+                console.log("Intersection observed, doing heavy work...");
+                for (let i = 0; i < 1000000; i++) {}
+            });
+        }, { threshold: [0, 0.1, 0.5, 1] });
+        observerIo.observe(document.body);
+    </script>
+
+</body>
+</html>
