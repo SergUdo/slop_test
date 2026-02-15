@@ -1,0 +1,63 @@
+name: AI Slop Gate Static Analysis
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  # Allows manual triggering of the workflow
+  workflow_dispatch:
+
+# Grant permissions for managing PR labels, comments, and checking out content
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache ai-slop-gate cache directory
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ai-slop-gate
+          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', '**/*.yml', '**/*.yaml') }}
+          restore-keys: |
+            ai-slop-gate-cache-${{ runner.os }}-
+
+      # Run static analysis. 'continue-on-error' allows us to label the PR even if slop is found.
+      - name: Static Analysis (ai-slop-gate)
+        id: static_gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+        run: |
+          mkdir -p ~/.cache/ai-slop-gate
+          docker run --rm \
+            -v "${{ github.workspace }}:/data" \
+            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
+            -e GITHUB_TOKEN \
+            ghcr.io/sergudo/ai-slop-gate:latest \
+            run --provider static --path /data > raw_report.txt 2>&1
+          
+          cat raw_report.txt
+
+      - name: Professional Static Report
+        if: steps.static_gate.outcome == 'failure' && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sed -n '/=== AI SLOP GATE STATIC REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
+          
+          echo "### 🚨 AI Slop Gate Static Analysis" > final_comment.md
+          echo "The static analysis pipeline has identified policy violations that require attention." >> final_comment.md
+          echo "" >> final_comment.md
+          cat clean_report.md >> final_comment.md
+          
+          gh pr comment ${{ github.event.pull_request.number }} --body-file final_comment.md --repo ${{ github.repository }}
+          
