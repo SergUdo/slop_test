@@ -1,4 +1,4 @@
-name: AI Slop Gate Compliance Analysis
+name: AI Slop Gate Static Analysis
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  compliance-analysis:
+  static-analysis:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
 
@@ -28,23 +28,32 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
-      # Run compliance analysis
-      - name: Compliance Analysis (ai-slop-gate)
-        id: compliance_gate
+      # Run static analysis
+      - name: Static Analysis (ai-slop-gate)
+        id: static_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
         run: |
           mkdir -p ~/.cache/ai-slop-gate
           
-          # Run compliance check and capture output (don't fail on non-zero exit)
+          # Check if policy.yml exists, otherwise use default
+          POLICY_FLAG=""
+          if [ -f "${{ github.workspace }}/policy.yml" ]; then
+            echo "📋 Using custom policy.yml"
+            POLICY_FLAG="--policy /data/policy.yml"
+          else
+            echo "📋 Using default policy"
+          fi
+          
+          # Run static analysis and capture output
           set +e  # Disable exit on error temporarily
           docker run --rm \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --compliance --policy /data/policy.yml --path /data > raw_report.txt 2>&1
+            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1
           
           EXIT_CODE=$?
           set -e  # Re-enable exit on error
@@ -73,24 +82,24 @@ jobs:
           exit 0
 
       # Post comment on PR (always, not just on failure)
-      - name: Post Compliance Report to PR
+      - name: Post Static Analysis Report to PR
         if: github.event_name == 'pull_request' && always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Extract clean report (fix sed pattern)
+          # Extract clean report
           sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
           
           # Check if report was extracted
           if [ ! -s clean_report.md ]; then
             echo "⚠️ Warning: Could not extract report from raw_report.txt"
             echo "=== NO REPORT GENERATED ===" > clean_report.md
-            echo "The compliance check may have failed to run properly." >> clean_report.md
+            echo "The static analysis may have failed to run properly." >> clean_report.md
           fi
           
           # Get values with defaults
-          VERDICT="${{ steps.compliance_gate.outputs.verdict }}"
-          FINDINGS="${{ steps.compliance_gate.outputs.findings }}"
+          VERDICT="${{ steps.static_gate.outputs.verdict }}"
+          FINDINGS="${{ steps.static_gate.outputs.findings }}"
           
           # Set defaults if empty
           VERDICT="${VERDICT:-UNKNOWN}"
@@ -117,7 +126,7 @@ jobs:
           
           # Create professional comment
           cat > final_comment.md << EOF
-          ## $EMOJI AI Slop Gate Compliance Analysis
+          ## $EMOJI AI Slop Gate Static Analysis
           
           **Status:** $STATUS  
           **Findings:** $FINDINGS issue(s) detected
@@ -129,23 +138,33 @@ jobs:
           # Append the clean report
           cat clean_report.md >> final_comment.md
           
-          # Add footer
+          # Add footer with helpful info
           cat >> final_comment.md << EOF
           
           ---
           
           <details>
-          <summary>📚 How to fix violations</summary>
+          <summary>📚 How to fix common issues</summary>
           
-          ### License Violations (GPL/AGPL)
-          1. Remove the dependency or find an alternative with a permissive license
-          2. If the dependency is necessary, consult with legal team
-          3. Add to \`.trivyignore\` only if approved by compliance team
+          ### Hardcoded Secrets
+          1. Move secrets to environment variables or secret management system
+          2. Use \`.env\` files (add to \`.gitignore\`)
+          3. For CI/CD, use GitHub Secrets or similar
           
-          ### Data Residency Violations
-          1. Ensure all endpoints use EU regions
-          2. Update configuration to use \`eu-west-1\`, \`eu-central-1\`, etc.
-          3. Remove references to US/AP regions
+          ### Dangerous Functions
+          1. Review usage of \`eval()\`, \`exec()\`, \`system()\`
+          2. Sanitize all user inputs
+          3. Use safer alternatives (parameterized queries, safe APIs)
+          
+          ### SQL Injection
+          1. Use parameterized queries/prepared statements
+          2. Never concatenate user input into SQL strings
+          3. Use ORM frameworks when possible
+          
+          ### TODOs
+          1. Complete or document security-related TODOs
+          2. Create issues for tracking
+          3. Remove completed TODOs
           
           </details>
           
@@ -158,9 +177,8 @@ jobs:
             --repo ${{ github.repository }}
 
       # Set job status based on verdict
-      - name: Check Compliance Result
-        if: steps.compliance_gate.outputs.verdict == 'BLOCKING'
+      - name: Check Static Analysis Result
+        if: steps.static_gate.outputs.verdict == 'BLOCKING'
         run: |
-          echo "❌ Compliance analysis found blocking violations"
+          echo "❌ Static analysis found blocking violations"
           exit 1
-          
