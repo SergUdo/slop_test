@@ -138,8 +138,9 @@ jobs:
           # Append the clean report
           cat clean_report.md >> final_comment.md
           
-          # Add footer
-          cat >> final_comment.md << EOF
+          # Add footer with fix guide ONLY if there are violations
+          if [ "$FINDINGS" != "0" ] && [ "$VERDICT" != "ALLOW" ]; then
+            cat >> final_comment.md << EOF
           
           ---
           
@@ -157,6 +158,11 @@ jobs:
           3. Remove references to US/AP regions
           
           </details>
+          EOF
+          fi
+          
+          # Always add footer
+          cat >> final_comment.md << EOF
           
           <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) | Run: \`${{ github.run_id }}\`</sub>
           EOF
