@@ -1,20 +1,18 @@
-name: AI Slop Gate Static Analysis
+name: AI Slop Gate Compliance Analysis
 
 on:
   pull_request:
     branches: [ main ]
   push:
     branches: [ main ]
-  # Allows manual triggering of the workflow
   workflow_dispatch:
 
-# Grant permissions for managing PR labels, comments, and checking out content
 permissions:
   pull-requests: write
   contents: read
 
 jobs:
-  static-analysis:
+  compliance-analysis:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
 
@@ -30,33 +28,115 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
-      # Run static analysis. 'continue-on-error' allows us to label the PR even if slop is found.
-      - name: Static Analysis (ai-slop-gate)
-        id: static_gate
+      # Run compliance analysis
+      - name: Compliance Analysis (ai-slop-gate)
+        id: compliance_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
         run: |
           mkdir -p ~/.cache/ai-slop-gate
+          
+          # Run compliance check and capture output
           docker run --rm \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --compliance --path /data > raw_report.txt 2>&1
+            run --compliance --policy /data/policy.yml --path /data > raw_report.txt 2>&1
           
+          EXIT_CODE=$?
+          
+          # Always show report
           cat raw_report.txt
+          
+          # Save exit code for later steps
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Extract verdict
+          VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}')
+          echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
+          
+          # Count findings
+          FINDINGS=$(grep "Total findings:" raw_report.txt | awk '{print $NF}')
+          echo "findings=$FINDINGS" >> $GITHUB_OUTPUT
+          
+          # Exit with original code
+          exit $EXIT_CODE
 
-      - name: Professional Static Report
-        if: steps.static_gate.outcome == 'failure' && github.event_name == 'pull_request'
+      # Post comment on PR (always, not just on failure)
+      - name: Post Compliance Report to PR
+        if: github.event_name == 'pull_request' && always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sed -n '/=== AI SLOP GATE STATIC REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
+          # Extract clean report (fix sed pattern)
+          sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
           
-          echo "### 🚨 AI Slop Gate Static Analysis" > final_comment.md
-          echo "The static analysis pipeline has identified policy violations that require attention." >> final_comment.md
-          echo "" >> final_comment.md
+          # Determine emoji and status based on verdict
+          VERDICT="${{ steps.compliance_gate.outputs.verdict }}"
+          FINDINGS="${{ steps.compliance_gate.outputs.findings }}"
+          
+          if [ "$VERDICT" = "BLOCKING" ]; then
+            EMOJI="🚨"
+            STATUS="**BLOCKING** - Action Required"
+            COLOR="⚠️"
+          elif [ "$VERDICT" = "ADVISORY" ]; then
+            EMOJI="⚠️"
+            STATUS="**ADVISORY** - Review Recommended"
+            COLOR="📋"
+          else
+            EMOJI="✅"
+            STATUS="**PASSED** - No Issues Found"
+            COLOR="✨"
+          fi
+          
+          # Create professional comment
+          cat > final_comment.md << EOF
+          ## $EMOJI AI Slop Gate Compliance Analysis
+          
+          **Status:** $STATUS  
+          **Findings:** $FINDINGS issue(s) detected
+          
+          ---
+          
+          EOF
+          
+          # Append the clean report
           cat clean_report.md >> final_comment.md
           
-          gh pr comment ${{ github.event.pull_request.number }} --body-file final_comment.md --repo ${{ github.repository }}
+          # Add footer
+          cat >> final_comment.md << EOF
+          
+          ---
+          
+          <details>
+          <summary>📚 How to fix violations</summary>
+          
+          ### License Violations (GPL/AGPL)
+          1. Remove the dependency or find an alternative with a permissive license
+          2. If the dependency is necessary, consult with legal team
+          3. Add to \`.trivyignore\` only if approved by compliance team
+          
+          ### Data Residency Violations
+          1. Ensure all endpoints use EU regions
+          2. Update configuration to use \`eu-west-1\`, \`eu-central-1\`, etc.
+          3. Remove references to US/AP regions
+          
+          </details>
+          
+          <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) | Run: \`${{ github.run_id }}\`</sub>
+          EOF
+          
+          # Post comment
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body-file final_comment.md \
+            --repo ${{ github.repository }}
+
+      # Set job status based on verdict
+      - name: Check Compliance Result
+        if: steps.compliance_gate.outputs.verdict == 'BLOCKING'
+        run: |
+          echo "❌ Compliance analysis found blocking violations"
+          exit 1
+          
