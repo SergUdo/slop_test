@@ -1,62 +1,84 @@
-name: AI Slop Gate Static Analysis
+name: AI Slop Gate GROQ Analysis
 
 on:
   pull_request:
     branches: [ main ]
-  push:
-    branches: [ main ]
-  # Allows manual triggering of the workflow
   workflow_dispatch:
 
-# Grant permissions for managing PR labels, comments, and checking out content
 permissions:
   pull-requests: write
   contents: read
 
 jobs:
-  static-analysis:
+  llm-analysis:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Cache ai-slop-gate cache directory
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ai-slop-gate
-          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', '**/*.yml', '**/*.yaml') }}
-          restore-keys: |
-            ai-slop-gate-cache-${{ runner.os }}-
-
-      # Run static analysis. 'continue-on-error' allows us to label the PR even if slop is found.
-      - name: Static Analysis (ai-slop-gate)
-        id: static_gate
+      - name: Run AI Slop Gate (Gemini PR analysis)
+        id: slop_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SLOPE_GATE_GROQ: ${{ secrets.SLOPE_GATE_GROQ }}
         continue-on-error: true
         run: |
-          mkdir -p ~/.cache/ai-slop-gate
           docker run --rm \
-            -v "${{ github.workspace }}:/data" \
-            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
+            -e SLOPE_GATE_GROQ \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static --path /data > raw_report.txt 2>&1
-          
-          cat raw_report.txt
+            run \
+              --provider groq \
+              --policy policy.yml \
+              --github-repo "${{ github.repository }}" \
+              --pr-id "${{ github.event.pull_request.number }}" \
+            > llm_report.txt 2>&1
 
-      - name: Professional Static Report
-        if: steps.static_gate.outcome == 'failure' && github.event_name == 'pull_request'
+          echo "=== RAW LLM REPORT ==="
+          cat llm_report.txt
+
+      - name: Extract clean report
+        if: steps.slop_gate.outcome == 'failure'
+        run: |
+          sed -n '/=== AI SLOP GATE LLM GROQ REPORT ===/,/=== END OF REPORT ===/p' llm_report.txt > clean_report.md
+
+      - name: Post PR Comment
+        if: steps.slop_gate.outcome == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          sed -n '/=== AI SLOP GATE STATIC REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
-          
-          echo "### 🚨 AI Slop Gate Static Analysis" > final_comment.md
-          echo "The static analysis pipeline has identified policy violations that require attention." >> final_comment.md
+          echo "### 🚨 AI Slop Gate LLM GROQ Analysis" > final_comment.md
+          echo "The LLM-based analysis detected policy violations." >> final_comment.md
           echo "" >> final_comment.md
           cat clean_report.md >> final_comment.md
-          
-          gh pr comment ${{ github.event.pull_request.number }} --body-file final_comment.md --repo ${{ github.repository }}
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body-file final_comment.md \
+            --repo ${{ github.repository }}
+
+      - name: Label PR on Policy Violation
+        if: steps.slop_gate.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL_NAME="slop-detected"
+
+          gh label create "$LABEL_NAME" \
+            --color "ff0000" \
+            --description "AI Slop detected by automated gate" \
+            --repo ${{ github.repository }} || true
+
+          gh pr edit ${{ github.event.pull_request.number }} \
+            --add-label "$LABEL_NAME" \
+            --repo ${{ github.repository }}
+
+      # Optional: Uncomment the following step if you prefer hard-blocking by closing the PR automatically.
+      # - name: Close PR on Policy Violation
+      #   if: steps.slop_gate.outcome == 'failure'
+      #   env:
+      #     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   run: |
+      #     gh pr close ${{ github.event.pull_request.number }} \
+      #       --comment "🚫 PR closed based on the AI Slop Gate analysis. Please review the feedback and improve the content before re-submitting." \
+      #       --repo ${{ github.repository }}
