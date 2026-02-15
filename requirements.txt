@@ -1,0 +1,30 @@
+# Requirements with REAL GPL-licensed packages
+# These packages actually exist and have GPL/LGPL licenses
+
+# ============================================
+# GPL-3.0 Packages (BLOCKING violations)
+# ============================================
+
+# MySQL Connector - GPL-2.0 (commercial license available)
+mysql-connector-python==8.0.33
+
+# GnuPG wrapper - GPL-3.0
+python-gnupg==0.5.1
+
+# ============================================
+# LGPL Packages (ADVISORY/WARNING violations)
+# ============================================
+
+# PyQt5 - LGPL-3.0 (GUI framework)
+PyQt5==5.15.9
+
+# PySide2 - LGPL-3.0 (Qt binding)
+PySide2==5.15.2.1
+
+# ============================================
+# Safe packages (MIT/BSD/Apache) - for comparison
+# ============================================
+
+requests==2.31.0
+flask==3.0.0
+pandas==2.1.0

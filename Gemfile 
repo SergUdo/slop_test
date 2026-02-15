@@ -1,0 +1,29 @@
+# Gemfile with REAL GPL-licensed Ruby gems
+
+source 'https://rubygems.org'
+
+# ============================================
+# GPL-3.0 Gems (BLOCKING violations)
+# ============================================
+
+# GPL v3 licensed gem
+gem 'gpl3', '~> 1.1.1'
+
+# GNU Readline - GPL-2.0
+gem 'rb-readline', '~> 0.5.5'
+
+# ============================================
+# LGPL Gems (ADVISORY/WARNING)
+# ============================================
+
+# Some gems with LGPL licenses
+# (Add if you find any - less common in Ruby ecosystem)
+
+# ============================================
+# Safe gems (MIT/BSD/Apache)
+# ============================================
+
+gem 'rails', '~> 7.1.0'
+gem 'puma', '~> 6.4'
+gem 'redis', '~> 5.0'
+gem 'sidekiq', '~> 7.2'
