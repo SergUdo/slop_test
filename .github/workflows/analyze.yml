@@ -60,4 +60,3 @@ jobs:
           cat clean_report.md >> final_comment.md
           
           gh pr comment ${{ github.event.pull_request.number }} --body-file final_comment.md --repo ${{ github.repository }}
-          

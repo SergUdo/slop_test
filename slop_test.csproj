@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ========================================================= -->
+  <!--  LICENSE VIOLATION SECTION                                -->
+  <!-- ========================================================= -->
+  <!-- This project intentionally references forbidden licenses: -->
+  <!-- GPL-2.0, GPL-3.0, AGPL-3.0                                -->
+  <!-- to test compliance scanners.                              -->
+  <!-- ========================================================= -->
+
+  <ItemGroup>
+    <None Include="LICENSE" />
+    <None Include="packages.config" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework> <!-- EOL framework -->
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <!-- ========================================================= -->
+  <!--  VULNERABLE DEPENDENCIES (Trivy will explode here)        -->
+  <!-- ========================================================= -->
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="1.0.1" />
+    <PackageReference Include="SharpZipLib" Version="0.86.0" />
+    <PackageReference Include="Microsoft.Data.OData" Version="5.0.0" />
+    <PackageReference Include="log4net" Version="1.2.10" />
+    <PackageReference Include="MySql.Data" Version="6.2.0" />
+    <PackageReference Include="YamlDotNet" Version="3.2.0" />
+  </ItemGroup>
+
+</Project>
