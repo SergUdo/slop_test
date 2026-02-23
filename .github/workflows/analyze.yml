@@ -14,5 +14,3 @@ jobs:
         slope-gate-groq: ${{ secrets.SLOPE_GATE_GROQ }}
         compliance: 'true'
         enforcement: 'advisory'
-        policy: 'policy.yml'
-        
