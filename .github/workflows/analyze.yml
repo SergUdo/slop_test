@@ -5,37 +5,14 @@ jobs:
   analyze:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
-
-      - name: Install ai-slop-gate
-        run: pip install -e .
-
-      - name: Cache LLM responses
-        uses: actions/cache@v3
-        with:
-          path: .ai-slop-cache
-          key: llm-cache-${{ hashFiles('**/*.py', '**/*.js') }}
-          restore-keys: llm-cache-
-
-      - name: Run Static Analysis
-        run: |
-          python -m ai_slop_gate.cli run \
-            --provider static \
-            --policy policy.yml \
-            --enforcement advisory
-
-      - name: Run LLM Analysis
-        env:
-          GROQ_API_KEY: ${{ secrets.SLOPE_GATE_GROQ }}
-        run: |
-          python -m ai_slop_gate.cli run \
-            --provider groq \
-            --llm-local \
-            --policy policy.yml \
-            --enforcement advisory
+    - name: Run AI Slop Gate
+      uses: SergUdo/ai-slop-gate@main
+      with:
+        provider: 'groq'
+        slope-gate-groq: ${{ secrets.SLOPE_GATE_GROQ }}
+        compliance: 'true'
+        enforcement: 'advisory'
+        policy: 'policy.yml'
+        
