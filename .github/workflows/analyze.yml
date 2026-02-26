@@ -17,4 +17,4 @@ jobs:
             run --provider static 
             --policy /app/policy.yml 
             --path /github/workspace 
-            --github-pr ${{ github.event.pull_request.number }}
+            --github-pr
