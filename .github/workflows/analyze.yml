@@ -1,16 +1,15 @@
 name: AI Slop Gate
+
 on: [pull_request]
 
 jobs:
-  analyze:
+  security-scan:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-
-    - name: Run AI Slop Gate
-      uses: SergUdo/ai-slop-gate@main
-      with:
-        provider: 'groq'
-        slope-gate-groq: ${{ secrets.SLOPE_GATE_GROQ }}
-        compliance: 'true'
-        enforcement: 'advisory'
+      - uses: actions/checkout@v4
+      
+      - name: Run AI Slop Gate
+        uses: SergUdo/ai-slop-gate@v1
+        with:
+          provider: 'static'
+          policy: 'policy.yml'
