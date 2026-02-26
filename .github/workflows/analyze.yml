@@ -13,12 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Run Analysis
+      - name: Run AI Slop Gate
         uses: docker://ghcr.io/sergudo/ai-slop-gate:latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
-          GITHUB_EVENT_PATH: /github/workflow/event.json
         with:
-          args: run --provider gemini --path /github/workspace --policy /app/policy.yml
+          args: run --provider gemini --path /github/workspace --policy /app/policy.yml --no-cache
+          
