@@ -12,7 +12,6 @@ jobs:
         uses: docker://ghcr.io/sergudo/ai-slop-gate:latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_ACTIONS: "true"
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_PATH: /github/workflow/event.json
         with:
-          args: run --provider static --policy /app/policy.yml --path /github/workspace
+          args: run --provider static --path /github/workspace --policy /app/policy.yml
