@@ -9,8 +9,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Run AI Slop Gate
-        run: |
-          docker run --rm \
-            -v "${{ github.workspace }}:/github/workspace" \
-            ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static --policy /app/policy.yml --path /github/workspace
+        uses: docker://ghcr.io/sergudo/ai-slop-gate:latest
+        with:
+          args: run --provider static --path /github/workspace
+          
