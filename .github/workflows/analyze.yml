@@ -11,5 +11,4 @@ jobs:
       - name: Run AI Slop Gate
         uses: docker://ghcr.io/sergudo/ai-slop-gate:latest
         with:
-          args: run --provider static --path /github/workspace
-          
+          args: run --provider static --policy /app/ai_slop_gate/policy.yml --path /github/workspace
