@@ -28,6 +28,15 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
+      - name: Test Gemini directly
+        run: |
+            curl -X POST \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GOOGLE_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"contents":[{"parts":[{"text":"hello"}]}]}'
+        env:
+            GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+
       # Run LLM analysis
       - name: LLM Analysis (ai-slop-gate)
         id: llm_gate
