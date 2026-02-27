@@ -49,7 +49,6 @@ jobs:
             ghcr.io/sergudo/ai-slop-gate:latest \
             run --provider groq \
                 --llm-local \
-                --llm-model llama-3.3-70b-versatile \
                 --policy /src/policy.yml \
                 --path /src > raw_report.txt 2>&1
           
