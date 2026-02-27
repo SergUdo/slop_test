@@ -1,4 +1,4 @@
-name: AI Slop Gate LLM GEMINI Analysis
+name: AI Slop Gate LLM GROQ Analysis
 
 on:
   pull_request:
@@ -28,29 +28,19 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
-      # Test Gemini API connectivity
-      - name: Test Gemini directly
-        run: |
-            curl -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$GEMINI_API_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{"contents":[{"parts":[{"text":"hello"}]}]}'
-        env:
-            GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-
       # Run LLM analysis
       - name: LLM Analysis (ai-slop-gate)
         id: llm_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SLOPE_GATE_GROQ: ${{ secrets.SLOPE_GATE_GROQ }}
         continue-on-error: true
         run: |
           mkdir -p ~/.cache/ai-slop-gate
           
           # Check if API key is available
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "⚠️ GEMINI_API_KEY not set, skipping LLM analysis"
+          if [ -z "$SLOPE_GATE_GROQ" ]; then
+            echo "⚠️ SLOPE_GATE_GROQ not set, skipping LLM analysis"
             echo "verdict=SKIPPED" >> $GITHUB_OUTPUT
             echo "findings=0" >> $GITHUB_OUTPUT
             exit 0
@@ -71,9 +61,9 @@ jobs:
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
-            -e GEMINI_API_KEY \
+            -e SLOPE_GATE_GROQ \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1
+            run --provider groq --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1
           
           EXIT_CODE=$?
           set -e  # Re-enable exit on error
@@ -113,9 +103,9 @@ jobs:
           ## ⏭️ AI Slop Gate LLM Analysis
           
           **Status:** SKIPPED  
-          **Reason:** GEMINI_API_KEY not configured
+          **Reason:** SLOPE_GATE_GROQ not configured
           
-          To enable LLM analysis, add \`GEMINI_API_KEY\` to repository secrets.
+          To enable LLM analysis, add \`SLOPE_GATE_GROQ\` to repository secrets.
           
           <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) | Run: \`${{ github.run_id }}\`</sub>
           EOF
