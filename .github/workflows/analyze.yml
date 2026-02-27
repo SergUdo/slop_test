@@ -28,6 +28,7 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
+      # Test Gemini API connectivity
       - name: Test Gemini directly
         run: |
             curl -X POST \
