@@ -12,6 +12,83 @@ permissions:
   contents: read
 
 jobs:
+  static-analysis:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      # ✅ NEW: Generate SBOM
+      - name: Generate SBOM (Software Bill of Materials)
+        run: |
+          echo "📦 Generating SBOM..."
+          
+          # Install Syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          
+          # Generate SBOM in multiple formats
+          syft . -o json > sbom.json
+          syft . -o spdx-json > sbom-spdx.json
+          syft . -o cyclonedx-json > sbom-cyclonedx.json
+          
+          # Show summary
+          echo "✅ SBOM generated successfully:"
+          ls -lh sbom*.json
+          
+          # Count components
+          COMPONENTS=$(jq '.artifacts | length' sbom.json 2>/dev/null || echo "0")
+          echo "📊 Total components: $COMPONENTS"
+      
+      # Upload SBOM artifacts
+      - name: Upload SBOM Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-reports-${{ github.run_number }}
+          path: |
+            sbom.json
+            sbom-spdx.json
+            sbom-cyclonedx.json
+          retention-days: 90
+      
+      # Add SBOM info to existing PR comment
+      - name: Add SBOM Summary to PR Comment
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          COMPONENTS=$(jq '.artifacts | length' sbom.json 2>/dev/null || echo "0")
+          LANGUAGES=$(jq -r '.artifacts[].type' sbom.json 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
+          
+          cat >> pr_comment.md << EOF
+          
+          ---
+          
+          ### 📦 Software Bill of Materials (SBOM)
+          
+          **Components:** $COMPONENTS packages detected  
+          **Languages:** $LANGUAGES
+          
+          **Artifacts available** in workflow run:
+          - \`sbom.json\` - Syft native format
+          - \`sbom-spdx.json\` - SPDX 2.3 (EU standard)
+          - \`sbom-cyclonedx.json\` - CycloneDX format
+          
+          <details>
+          <summary>📋 Top 10 Dependencies</summary>
+          
+          $(jq -r '.artifacts[:10] | .[] | "- **\(.name)** \(.version) (\(.type))"' sbom.json 2>/dev/null || echo "Unable to parse SBOM")
+          
+          </details>
+          
+          <sub>🔍 Generated with [Syft](https://github.com/anchore/syft) | Retention: 90 days</sub>
+          EOF
+          
+          # Append to existing PR comment or create new
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body-file pr_comment.md \
+            --repo ${{ github.repository }}
   llm-analysis:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
