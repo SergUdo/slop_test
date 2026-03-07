@@ -13,319 +13,127 @@ permissions:
 
 jobs:
   static-analysis:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # FIX: Restore dependencies before Syft scan.
-      # Without this: Syft only parses manifest files (no licenses, no hashes).
-      # With this: Syft resolves full metadata from installed packages.
-      - name: Restore dependencies (language-agnostic)
+      # Restore dependencies to allow Syft/Trivy to see full metadata (licenses, hashes)
+      - name: Restore dependencies
         run: |
-          # .NET / C# → restores packages.lock.json which Syft uses for NuGet metadata
-          if find . -name "*.csproj" -o -name "*.sln" | grep -q .; then
-            echo "🔵 .NET project detected, restoring NuGet packages..."
-            dotnet restore || true
-          fi
-
-          # Python → installs packages so Syft reads metadata from site-packages
           if [ -f "requirements.txt" ]; then
-            echo "🐍 Python project detected, installing dependencies..."
             pip install -r requirements.txt --quiet || true
           fi
-          if [ -f "Pipfile.lock" ]; then
-            pip install pipenv --quiet && pipenv install --system || true
-          fi
-
-          # Node.js
           if [ -f "package-lock.json" ]; then
-            echo "🟢 Node.js project detected, running npm ci..."
             npm ci --quiet || true
-          elif [ -f "yarn.lock" ]; then
-            yarn install --frozen-lockfile --silent || true
           fi
-
-          # Go
-          if [ -f "go.mod" ]; then
-            echo "🔵 Go project detected..."
-            go mod download || true
-          fi
-
           echo "✅ Dependency restore complete"
 
-      # Generate SBOM (language-agnostic, works with any project)
-      - name: Install Syft
+      - name: Cache ai-slop-gate data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ai-slop-gate
+          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', 'policy.yml') }}
+
+      - name: Run Static Analysis
+        id: static_gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
-            | sh -s -- -b /usr/local/bin
+          mkdir -p ~/.cache/ai-slop-gate
+          
+          POLICY_FLAG=""
+          if [ -f "policy.yml" ]; then
+            POLICY_FLAG="--policy /data/policy.yml"
+          fi
+          
+          # Run the gate and capture logs
+          docker run --rm \
+            -v "${{ github.workspace }}:/data" \
+            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
+            -e GITHUB_TOKEN \
+            ghcr.io/sergudo/ai-slop-gate:latest \
+            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
+          
+          cat raw_report.txt
+          
+          # Parse outputs for the PR comment
+          VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}' || echo "UNKNOWN")
+          FINDINGS=$(grep "Total findings:" raw_report.txt | awk '{print $NF}' || echo "0")
+          COMP_COUNT=$(grep "Generated SBOM with" raw_report.txt | sed -E 's/.*with ([0-9]+) dependencies.*/\1/' | head -1 || echo "0")
+          CVE_COUNT=$(grep "Trivy Scan Complete. Found" raw_report.txt | sed -E 's/.*Found ([0-9]+) vulnerabilities.*/\1/' | head -1 || echo "0")
+          
+          # Extract top 10 components from the new sbom.json
+          if [ -f "sbom.json" ]; then
+             TOP10=$(jq -r '.artifacts[:10] | .[] | "- \(.name) (\(.version))"' sbom.json | sed 's/$/\\n/' | tr -d '\n')
+          else
+             TOP10="No components found."
+          fi
 
-      - name: Generate SBOM
-        id: sbom
-        run: |
-          echo "📦 Generating SBOM..."
-
-          syft . -o json           > sbom.json
-          syft . -o spdx-json      > sbom-spdx.json
-          syft . -o cyclonedx-json > sbom-cyclonedx.json
-
-          echo "✅ SBOM files:"
-          ls -lh sbom*.json
-
-          COMPONENTS=$(python3 -c "import json; d=json.load(open('sbom.json')); print(len(d.get('artifacts', [])))")
-          echo "📊 Total components: $COMPONENTS"
-          echo "components=$COMPONENTS" >> "$GITHUB_OUTPUT"
-
-          TOP10=$(python3 -c "
-          import json
-          arts = json.load(open('sbom.json')).get('artifacts', [])[:10]
-          for a in arts:
-              print(f'- \`{a[\"name\"]}\` {a.get(\"version\",\"\")} ({a.get(\"type\",\"\")})')
-          ")
-          # Store top10 for PR comment (newlines → escaped)
-          echo "top10<<SBOM_EOF" >> "$GITHUB_OUTPUT"
-          echo "$TOP10"           >> "$GITHUB_OUTPUT"
-          echo "SBOM_EOF"         >> "$GITHUB_OUTPUT"
-
-      # FIX 1: Install Trivy before using it
-      - name: Install Trivy
-        run: |
-          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
-            | sh -s -- -b /usr/local/bin
-
-      # FIX: Use 'trivy fs' instead of 'trivy sbom' to find real CVEs.
-      # 'trivy sbom' only re-reads the SBOM without querying the CVE DB.
-      # 'trivy fs' scans the filesystem and outputs enriched CycloneDX with vulnerabilities.
-      - name: Enrich SBOM with vulnerabilities (Trivy VEX)
-        id: trivy
-        run: |
-          trivy fs . \
-            --format cyclonedx \
-            --output sbom-cyclonedx-vex.json \
-            --exit-code 0 \
-            --quiet
-
-          CVES=$(python3 -c "
-          import json
-          d = json.load(open('sbom-cyclonedx-vex.json'))
-          print(len(d.get('vulnerabilities', [])))
-          " 2>/dev/null || echo "0")
-          echo "📊 CVEs found: $CVES"
-          echo "cves=$CVES" >> "$GITHUB_OUTPUT"
+          echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
+          echo "findings=$FINDINGS" >> $GITHUB_OUTPUT
+          echo "components=$COMP_COUNT" >> $GITHUB_OUTPUT
+          echo "cves=$CVE_COUNT" >> $GITHUB_OUTPUT
+          echo "top10=$TOP10" >> $GITHUB_OUTPUT
 
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: sbom-reports-${{ github.run_number }}
-          path: |
-            sbom.json
-            sbom-spdx.json
-            sbom-cyclonedx.json
-            sbom-cyclonedx-vex.json
-          retention-days: 90
+          path: sbom*.json
+          retention-days: 30
 
-      - name: Cache ai-slop-gate cache directory
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ai-slop-gate
-          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', '**/*.yml', '**/*.yaml') }}
-          restore-keys: |
-            ai-slop-gate-cache-${{ runner.os }}-
-
-      # Run static analysis
-      - name: Static Analysis (ai-slop-gate)
-        id: static_gate
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
-        run: |
-          mkdir -p ~/.cache/ai-slop-gate
-          
-          # Check if policy.yml exists, otherwise use default
-          POLICY_FLAG=""
-          if [ -f "${{ github.workspace }}/policy.yml" ]; then
-            echo "📋 Using custom policy.yml"
-            POLICY_FLAG="--policy /data/policy.yml"
-          else
-            echo "📋 Using default policy"
-          fi
-          
-          # Run static analysis and capture output
-          set +e  # Disable exit on error temporarily
-          docker run --rm \
-            -v "${{ github.workspace }}:/data" \
-            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
-            -e GITHUB_TOKEN \
-            ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1
-          
-          EXIT_CODE=$?
-          set -e  # Re-enable exit on error
-          
-          # Always show report
-          cat raw_report.txt
-          
-          # Save exit code for later steps
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
-          
-          # Extract verdict (default to UNKNOWN if not found)
-          VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}' || echo "UNKNOWN")
-          echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
-          
-          # Count findings (default to 0 if not found)
-          FINDINGS=$(grep "Total findings:" raw_report.txt | awk '{print $NF}' || echo "0")
-          echo "findings=$FINDINGS" >> $GITHUB_OUTPUT
-          
-          # Log extracted values
-          echo "📊 Extracted values:"
-          echo "   Exit code: $EXIT_CODE"
-          echo "   Verdict: $VERDICT"
-          echo "   Findings: $FINDINGS"
-          
-          # Don't fail here - let continue-on-error handle it
-          exit 0
-
-      # Post comment on PR (always, not just on failure)
-      - name: Post Static Analysis Report to PR
+      - name: Post PR Report
         if: github.event_name == 'pull_request' && always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Extract clean report
+          # Extract report content
           sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
           
-          # Check if report was extracted
-          if [ ! -s clean_report.md ]; then
-            echo "⚠️ Warning: Could not extract report from raw_report.txt"
-            echo "=== NO REPORT GENERATED ===" > clean_report.md
-            echo "The static analysis may have failed to run properly." >> clean_report.md
-          fi
-          
-          # Get values with defaults
           VERDICT="${{ steps.static_gate.outputs.verdict }}"
           FINDINGS="${{ steps.static_gate.outputs.findings }}"
           
-          # Set defaults if empty
-          VERDICT="${VERDICT:-UNKNOWN}"
-          FINDINGS="${FINDINGS:-0}"
+          # UI Logic for PR comment
+          EMOJI="❓"
+          STATUS="UNKNOWN"
+          if [ "$VERDICT" = "BLOCKING" ]; then EMOJI="🚨"; STATUS="**BLOCKING**"; fi
+          if [ "$VERDICT" = "ADVISORY" ]; then EMOJI="⚠️"; STATUS="**ADVISORY**"; fi
+          if [ "$VERDICT" = "ALLOW" ]; then EMOJI="✅"; STATUS="**PASSED**"; fi
           
-          echo "📊 Report values:"
-          echo "   Verdict: $VERDICT"
-          echo "   Findings: $FINDINGS"
+          cat > pr_comment.md << EOF
+          ## $EMOJI AI Slop Gate Analysis
           
-          # Determine emoji and status based on verdict
-          if [ "$VERDICT" = "BLOCKING" ]; then
-            EMOJI="🚨"
-            STATUS="**BLOCKING** - Action Required"
-          elif [ "$VERDICT" = "ADVISORY" ]; then
-            EMOJI="⚠️"
-            STATUS="**ADVISORY** - Review Recommended"
-          elif [ "$VERDICT" = "ALLOW" ]; then
-            EMOJI="✅"
-            STATUS="**PASSED** - No Issues Found"
-          else
-            EMOJI="❓"
-            STATUS="**UNKNOWN** - Check logs"
-          fi
-          
-          # Create professional comment
-          cat > final_comment.md << EOF
-          ## $EMOJI AI Slop Gate Static Analysis
-          
-          **Status:** $STATUS  
+          **Status:** $STATUS
           **Findings:** $FINDINGS issue(s) detected
           
           ---
-          
-          EOF
-          
-          # Append the clean report
-          cat clean_report.md >> final_comment.md
-          
-          # Add footer with fix guide ONLY if there are violations
-          if [ "$FINDINGS" != "0" ] && [ "$VERDICT" != "ALLOW" ]; then
-            cat >> final_comment.md << EOF
+          $(cat clean_report.md)
           
           ---
+          ### 📦 Supply Chain Information (SBOM)
+          - **Components detected:** ${{ steps.static_gate.outputs.components }}
+          - **CVEs found (Trivy):** ${{ steps.static_gate.outputs.cves }}
+          - **Standards:** SPDX 2.3, CycloneDX 1.6
           
           <details>
-          <summary>📚 How to fix common issues</summary>
-          
-          ### Hardcoded Secrets
-          1. Move secrets to environment variables or secret management system
-          2. Use \`.env\` files (add to \`.gitignore\`)
-          3. For CI/CD, use GitHub Secrets or similar
-          
-          ### Dangerous Functions
-          1. Review usage of \`eval()\`, \`exec()\`, \`system()\`
-          2. Sanitize all user inputs
-          3. Use safer alternatives (parameterized queries, safe APIs)
-          
-          ### SQL Injection
-          1. Use parameterized queries/prepared statements
-          2. Never concatenate user input into SQL strings
-          3. Use ORM frameworks when possible
-          
-          ### TODOs
-          1. Complete or document security-related TODOs
-          2. Create issues for tracking
-          3. Remove completed TODOs
-          
-          </details>
-          EOF
-          fi
-          
-          # Append SBOM section
-          cat >> final_comment.md << 'SBOM_BLOCK'
+          <summary>📋 Component Preview (Top 10)</summary>
 
-          ---
-
-          ### 📦 Software Bill of Materials (SBOM)
-          SBOM_BLOCK
-
-          cat >> final_comment.md << EOF
-          **Components detected:** ${{ steps.sbom.outputs.components }}
-          **CVEs found (Trivy):** ${{ steps.trivy.outputs.cves }}
-          **Formats:** \`sbom.json\` · \`sbom-spdx.json\` (SPDX 2.3) · \`sbom-cyclonedx.json\` (CycloneDX 1.6) · \`sbom-cyclonedx-vex.json\` (CycloneDX + CVE)
-
-          > ⚖️ SPDX 2.3 is compatible with the **EU Cyber Resilience Act** supply chain requirements.
-
-          <details>
-          <summary>📋 Top 10 components</summary>
-
-          ${{ steps.sbom.outputs.top10 }}
+          ${{ steps.static_gate.outputs.top10 }}
 
           </details>
 
-          <details>
-          <summary>⬇️ How to download SBOM</summary>
-
-          1. Click **Details** on this check
-          2. Scroll to **Artifacts** section
-          3. Download \`sbom-reports-${{ github.run_number }}.zip\`
-
-          </details>
-
-          EOF
-
-          # Always add footer
-          cat >> final_comment.md << EOF
-          
-          <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) | Run: \`${{ github.run_id }}\`</sub>
+          <sub>🤖 Report ID: \`${{ github.run_id }}\`</sub>
           EOF
           
-          # Post comment
-          gh pr comment ${{ github.event.pull_request.number }} \
-            --body-file final_comment.md \
-            --repo ${{ github.repository }}
+          gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md --repo ${{ github.repository }}
 
-      # Set job status based on verdict
-      - name: Check Static Analysis Result
+      - name: Final Verdict
         if: steps.static_gate.outputs.verdict == 'BLOCKING'
         run: |
-          echo "❌ Static analysis found blocking violations"
+          echo "FAIL: Blocking security issues or policy violations found."
           exit 1
           
