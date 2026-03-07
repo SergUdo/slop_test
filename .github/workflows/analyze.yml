@@ -53,16 +53,23 @@ jobs:
           echo "$TOP10"           >> "$GITHUB_OUTPUT"
           echo "SBOM_EOF"         >> "$GITHUB_OUTPUT"
 
-      - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: sbom-reports-${{ github.run_number }}
-          path: |
-            sbom.json
-            sbom-spdx.json
-            sbom-cyclonedx.json
-          retention-days: 90
+      - name: Enrich SBOM with vulnerabilities (Trivy VEX)
+        run: |
+          trivy sbom sbom-cyclonedx.json \
+            --format cyclonedx \
+            --output sbom-cyclonedx-vex.json
+
+            - name: Upload SBOM artifacts
+              uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                name: sbom-reports-${{ github.run_number }}
+                path: |
+                  sbom.json
+                  sbom-spdx.json
+                  sbom-cyclonedx.json
+                  sbom-cyclonedx-vex.json
+                retention-days: 90
 
       - name: Cache ai-slop-gate cache directory
         uses: actions/cache@v4
