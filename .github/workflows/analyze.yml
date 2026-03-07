@@ -1,4 +1,4 @@
-name: AI Slop Gate Static Analysis
+name: AI Slop Gate Gemini Analysis
 
 on:
   pull_request:
@@ -56,6 +56,7 @@ jobs:
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
+            -e GEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
             run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
           
