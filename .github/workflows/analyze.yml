@@ -53,23 +53,30 @@ jobs:
           echo "$TOP10"           >> "$GITHUB_OUTPUT"
           echo "SBOM_EOF"         >> "$GITHUB_OUTPUT"
 
+      # FIX 1: Install Trivy before using it
+      - name: Install Trivy
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sh -s -- -b /usr/local/bin
+
+      # FIX 2: Correct indentation — was nested inside Trivy run block
       - name: Enrich SBOM with vulnerabilities (Trivy VEX)
         run: |
           trivy sbom sbom-cyclonedx.json \
             --format cyclonedx \
             --output sbom-cyclonedx-vex.json
 
-            - name: Upload SBOM artifacts
-              uses: actions/upload-artifact@v4
-              if: always()
-              with:
-                name: sbom-reports-${{ github.run_number }}
-                path: |
-                  sbom.json
-                  sbom-spdx.json
-                  sbom-cyclonedx.json
-                  sbom-cyclonedx-vex.json
-                retention-days: 90
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-reports-${{ github.run_number }}
+          path: |
+            sbom.json
+            sbom-spdx.json
+            sbom-cyclonedx.json
+            sbom-cyclonedx-vex.json
+          retention-days: 90
 
       - name: Cache ai-slop-gate cache directory
         uses: actions/cache@v4
@@ -232,7 +239,7 @@ jobs:
 
           cat >> final_comment.md << EOF
           **Components detected:** ${{ steps.sbom.outputs.components }}
-          **Formats:** \`sbom.json\` · \`sbom-spdx.json\` (SPDX 2.3) · \`sbom-cyclonedx.json\` (CycloneDX 1.6)
+          **Formats:** \`sbom.json\` · \`sbom-spdx.json\` (SPDX 2.3) · \`sbom-cyclonedx.json\` (CycloneDX 1.6) · \`sbom-cyclonedx-vex.json\` (CycloneDX + CVE)
 
           > ⚖️ SPDX 2.3 is compatible with the **EU Cyber Resilience Act** supply chain requirements.
 
