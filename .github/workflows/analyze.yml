@@ -1,4 +1,4 @@
-name: AI Slop Gate LLM GEMINI Analysis
+name: AI Slop Gate Static Analysis
 
 on:
   pull_request:
@@ -12,13 +12,49 @@ permissions:
   contents: read
 
 jobs:
-  llm-analysis:
+  static-analysis:
     runs-on: ubuntu-22.04
     timeout-minutes: 20
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # FIX: Restore dependencies before Syft scan.
+      # Without this: Syft only parses manifest files (no licenses, no hashes).
+      # With this: Syft resolves full metadata from installed packages.
+      - name: Restore dependencies (language-agnostic)
+        run: |
+          # .NET / C# → restores packages.lock.json which Syft uses for NuGet metadata
+          if find . -name "*.csproj" -o -name "*.sln" | grep -q .; then
+            echo "🔵 .NET project detected, restoring NuGet packages..."
+            dotnet restore || true
+          fi
+
+          # Python → installs packages so Syft reads metadata from site-packages
+          if [ -f "requirements.txt" ]; then
+            echo "🐍 Python project detected, installing dependencies..."
+            pip install -r requirements.txt --quiet || true
+          fi
+          if [ -f "Pipfile.lock" ]; then
+            pip install pipenv --quiet && pipenv install --system || true
+          fi
+
+          # Node.js
+          if [ -f "package-lock.json" ]; then
+            echo "🟢 Node.js project detected, running npm ci..."
+            npm ci --quiet || true
+          elif [ -f "yarn.lock" ]; then
+            yarn install --frozen-lockfile --silent || true
+          fi
+
+          # Go
+          if [ -f "go.mod" ]; then
+            echo "🔵 Go project detected..."
+            go mod download || true
+          fi
+
+          echo "✅ Dependency restore complete"
 
       # Generate SBOM (language-agnostic, works with any project)
       - name: Install Syft
@@ -48,20 +84,36 @@ jobs:
           for a in arts:
               print(f'- \`{a[\"name\"]}\` {a.get(\"version\",\"\")} ({a.get(\"type\",\"\")})')
           ")
+          # Store top10 for PR comment (newlines → escaped)
           echo "top10<<SBOM_EOF" >> "$GITHUB_OUTPUT"
           echo "$TOP10"           >> "$GITHUB_OUTPUT"
           echo "SBOM_EOF"         >> "$GITHUB_OUTPUT"
 
+      # FIX 1: Install Trivy before using it
       - name: Install Trivy
         run: |
           curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
             | sh -s -- -b /usr/local/bin
 
+      # FIX: Use 'trivy fs' instead of 'trivy sbom' to find real CVEs.
+      # 'trivy sbom' only re-reads the SBOM without querying the CVE DB.
+      # 'trivy fs' scans the filesystem and outputs enriched CycloneDX with vulnerabilities.
       - name: Enrich SBOM with vulnerabilities (Trivy VEX)
+        id: trivy
         run: |
-          trivy sbom sbom-cyclonedx.json \
+          trivy fs . \
             --format cyclonedx \
-            --output sbom-cyclonedx-vex.json
+            --output sbom-cyclonedx-vex.json \
+            --exit-code 0 \
+            --quiet
+
+          CVES=$(python3 -c "
+          import json
+          d = json.load(open('sbom-cyclonedx-vex.json'))
+          print(len(d.get('vulnerabilities', [])))
+          " 2>/dev/null || echo "0")
+          echo "📊 CVEs found: $CVES"
+          echo "cves=$CVES" >> "$GITHUB_OUTPUT"
 
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
@@ -83,23 +135,14 @@ jobs:
           restore-keys: |
             ai-slop-gate-cache-${{ runner.os }}-
 
-      # Run LLM analysis
-      - name: LLM Analysis (ai-slop-gate)
-        id: llm_gate
+      # Run static analysis
+      - name: Static Analysis (ai-slop-gate)
+        id: static_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         continue-on-error: true
         run: |
           mkdir -p ~/.cache/ai-slop-gate
-          
-          # Check if API key is available
-          if [ -z "$GEMINI_API_KEY" ]; then
-            echo "⚠️ GEMINI_API_KEY not set, skipping LLM analysis"
-            echo "verdict=SKIPPED" >> $GITHUB_OUTPUT
-            echo "findings=0" >> $GITHUB_OUTPUT
-            exit 0
-          fi
           
           # Check if policy.yml exists, otherwise use default
           POLICY_FLAG=""
@@ -110,15 +153,14 @@ jobs:
             echo "📋 Using default policy"
           fi
           
-          # Run LLM analysis and capture output
+          # Run static analysis and capture output
           set +e  # Disable exit on error temporarily
           docker run --rm \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
-            -e GEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1
+            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1
           
           EXIT_CODE=$?
           set -e  # Re-enable exit on error
@@ -126,7 +168,7 @@ jobs:
           # Always show report
           cat raw_report.txt
           
-          # Save exit code
+          # Save exit code for later steps
           echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
           
           # Extract verdict (default to UNKNOWN if not found)
@@ -143,34 +185,15 @@ jobs:
           echo "   Verdict: $VERDICT"
           echo "   Findings: $FINDINGS"
           
-          # Don't fail here
+          # Don't fail here - let continue-on-error handle it
           exit 0
 
-      # Post comment on PR (always)
-      - name: Post LLM Analysis Report to PR
+      # Post comment on PR (always, not just on failure)
+      - name: Post Static Analysis Report to PR
         if: github.event_name == 'pull_request' && always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Check if analysis was skipped
-          if [ "${{ steps.llm_gate.outputs.verdict }}" = "SKIPPED" ]; then
-            cat > final_comment.md << EOF
-          ## ⏭️ AI Slop Gate LLM Analysis
-          
-          **Status:** SKIPPED  
-          **Reason:** GEMINI_API_KEY not configured
-          
-          To enable LLM analysis, add \`GEMINI_API_KEY\` to repository secrets.
-          
-          <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) | Run: \`${{ github.run_id }}\`</sub>
-          EOF
-            
-            gh pr comment ${{ github.event.pull_request.number }} \
-              --body-file final_comment.md \
-              --repo ${{ github.repository }}
-            exit 0
-          fi
-          
           # Extract clean report
           sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
           
@@ -178,12 +201,12 @@ jobs:
           if [ ! -s clean_report.md ]; then
             echo "⚠️ Warning: Could not extract report from raw_report.txt"
             echo "=== NO REPORT GENERATED ===" > clean_report.md
-            echo "The LLM analysis may have failed to run properly." >> clean_report.md
+            echo "The static analysis may have failed to run properly." >> clean_report.md
           fi
           
           # Get values with defaults
-          VERDICT="${{ steps.llm_gate.outputs.verdict }}"
-          FINDINGS="${{ steps.llm_gate.outputs.findings }}"
+          VERDICT="${{ steps.static_gate.outputs.verdict }}"
+          FINDINGS="${{ steps.static_gate.outputs.findings }}"
           
           # Set defaults if empty
           VERDICT="${VERDICT:-UNKNOWN}"
@@ -193,7 +216,7 @@ jobs:
           echo "   Verdict: $VERDICT"
           echo "   Findings: $FINDINGS"
           
-          # Determine emoji and status
+          # Determine emoji and status based on verdict
           if [ "$VERDICT" = "BLOCKING" ]; then
             EMOJI="🚨"
             STATUS="**BLOCKING** - Action Required"
@@ -210,12 +233,10 @@ jobs:
           
           # Create professional comment
           cat > final_comment.md << EOF
-          ## $EMOJI AI Slop Gate LLM Analysis (Gemini)
+          ## $EMOJI AI Slop Gate Static Analysis
           
           **Status:** $STATUS  
           **Findings:** $FINDINGS issue(s) detected
-          
-          > 🤖 **Deep Analysis:** This report uses AI to detect architectural issues, anti-patterns, and logic flaws that static analysis might miss.
           
           ---
           
@@ -231,22 +252,27 @@ jobs:
           ---
           
           <details>
-          <summary>📚 Understanding LLM Findings</summary>
+          <summary>📚 How to fix common issues</summary>
           
-          ### What LLM Analysis Detects
-          - Architectural anti-patterns and code smells
-          - Logic inconsistencies and contradictions
-          - Misleading naming or documentation
-          - Potential design flaws
-          - Security vulnerabilities in business logic
+          ### Hardcoded Secrets
+          1. Move secrets to environment variables or secret management system
+          2. Use \`.env\` files (add to \`.gitignore\`)
+          3. For CI/CD, use GitHub Secrets or similar
           
-          ### How to Interpret Findings
-          - **High Confidence (0.8-1.0):** Strong evidence of an issue
-          - **Medium Confidence (0.5-0.8):** Worth investigating
-          - **Low Confidence (<0.5):** Consider in context
+          ### Dangerous Functions
+          1. Review usage of \`eval()\`, \`exec()\`, \`system()\`
+          2. Sanitize all user inputs
+          3. Use safer alternatives (parameterized queries, safe APIs)
           
-          ### False Positives
-          LLM analysis may flag intentional design decisions. Review findings critically and validate against your requirements.
+          ### SQL Injection
+          1. Use parameterized queries/prepared statements
+          2. Never concatenate user input into SQL strings
+          3. Use ORM frameworks when possible
+          
+          ### TODOs
+          1. Complete or document security-related TODOs
+          2. Create issues for tracking
+          3. Remove completed TODOs
           
           </details>
           EOF
@@ -262,6 +288,7 @@ jobs:
 
           cat >> final_comment.md << EOF
           **Components detected:** ${{ steps.sbom.outputs.components }}
+          **CVEs found (Trivy):** ${{ steps.trivy.outputs.cves }}
           **Formats:** \`sbom.json\` · \`sbom-spdx.json\` (SPDX 2.3) · \`sbom-cyclonedx.json\` (CycloneDX 1.6) · \`sbom-cyclonedx-vex.json\` (CycloneDX + CVE)
 
           > ⚖️ SPDX 2.3 is compatible with the **EU Cyber Resilience Act** supply chain requirements.
@@ -273,14 +300,21 @@ jobs:
 
           </details>
 
-          **[⬇️ Download SBOM artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})**
+          <details>
+          <summary>⬇️ How to download SBOM</summary>
+
+          1. Click **Details** on this check
+          2. Scroll to **Artifacts** section
+          3. Download \`sbom-reports-${{ github.run_number }}.zip\`
+
+          </details>
 
           EOF
 
           # Always add footer
           cat >> final_comment.md << EOF
           
-          <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) + Gemini | Run: \`${{ github.run_id }}\`</sub>
+          <sub>🤖 Powered by [AI Slop Gate](https://github.com/SergUdo/ai-slop-gate) | Run: \`${{ github.run_id }}\`</sub>
           EOF
           
           # Post comment
@@ -289,8 +323,9 @@ jobs:
             --repo ${{ github.repository }}
 
       # Set job status based on verdict
-      - name: Check LLM Analysis Result
-        if: steps.llm_gate.outputs.verdict == 'BLOCKING'
+      - name: Check Static Analysis Result
+        if: steps.static_gate.outputs.verdict == 'BLOCKING'
         run: |
-          echo "❌ LLM analysis found blocking violations"
+          echo "❌ Static analysis found blocking violations"
           exit 1
+          
