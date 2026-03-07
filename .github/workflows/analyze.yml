@@ -41,6 +41,7 @@ jobs:
         id: gemini_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
         run: |
           mkdir -p ~/.cache/ai-slop-gate
           
@@ -49,14 +50,12 @@ jobs:
             POLICY_FLAG="--policy /data/policy.yml"
           fi
           
-          # FIX: Running as root to avoid "Permission Denied" on /data mount
-          # The files created here (sbom.json etc) will live on the runner's disk
           docker run --rm \
             --user root \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
-            -e SGEMINI_API_KEY \
+            -e GEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
             run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
           
