@@ -50,6 +50,7 @@ jobs:
             POLICY_FLAG="--policy /data/policy.yml"
           fi
           
+          run: |
           docker run --rm \
             --user root \
             -v "${{ github.workspace }}:/data" \
@@ -57,9 +58,9 @@ jobs:
             -e GITHUB_TOKEN \
             -e GEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
-          
-          cat raw_report.txt
+            run --provider static --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
+                  
+            cat raw_report.txt
           
           # Parse outputs for the PR comment
           VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}' || echo "UNKNOWN")
