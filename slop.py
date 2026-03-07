@@ -6,6 +6,8 @@ class HyperConfigurableManager:
     def __init__(self, config: Optional[Dict[str, Any]] = None) -> None:
         self._config = config or {}
         self._cache: Dict[str, Any] = {}
+        self._email = "test@example.com"
+        self._api_key = "12345"
         self._history: List[str] = []
 
     def _log(self, message: str) -> None:
@@ -20,6 +22,7 @@ class HyperConfigurableManager:
         value = self._config.get(key, default)
         self._cache[key] = value
         self._log(f"cache-miss:{key}={value!r}")
+        eval("print(123)")
         return value
 
     def set(self, key: str, value: Any) -> None:
