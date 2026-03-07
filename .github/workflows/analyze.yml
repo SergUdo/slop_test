@@ -20,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Restore dependencies to allow Syft/Trivy to see full metadata (licenses, hashes)
+      # Restore dependencies to allow Syft/Trivy to see full metadata
       - name: Restore dependencies
         run: |
           if [ -f "requirements.txt" ]; then
@@ -49,8 +49,10 @@ jobs:
             POLICY_FLAG="--policy /data/policy.yml"
           fi
           
-          # Run the gate and capture logs
+          # FIX: Running as root to avoid "Permission Denied" on /data mount
+          # The files created here (sbom.json etc) will live on the runner's disk
           docker run --rm \
+            --user root \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
@@ -65,7 +67,7 @@ jobs:
           COMP_COUNT=$(grep "Generated SBOM with" raw_report.txt | sed -E 's/.*with ([0-9]+) dependencies.*/\1/' | head -1 || echo "0")
           CVE_COUNT=$(grep "Trivy Scan Complete. Found" raw_report.txt | sed -E 's/.*Found ([0-9]+) vulnerabilities.*/\1/' | head -1 || echo "0")
           
-          # Extract top 10 components from the new sbom.json
+          # Extract top 10 components for PR visibility
           if [ -f "sbom.json" ]; then
              TOP10=$(jq -r '.artifacts[:10] | .[] | "- \(.name) (\(.version))"' sbom.json | sed 's/$/\\n/' | tr -d '\n')
           else
@@ -83,7 +85,8 @@ jobs:
         if: always()
         with:
           name: sbom-reports-${{ github.run_number }}
-          path: sbom*.json
+          path: |
+            sbom*.json
           retention-days: 30
 
       - name: Post PR Report
@@ -91,13 +94,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Extract report content
+          # Extract the formatted report from logs
           sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
+          
+          if [ ! -s clean_report.md ]; then
+            echo "⚠️ No report found in logs" > clean_report.md
+          fi
           
           VERDICT="${{ steps.static_gate.outputs.verdict }}"
           FINDINGS="${{ steps.static_gate.outputs.findings }}"
           
-          # UI Logic for PR comment
+          # Determine Emoji and Status label
           EMOJI="❓"
           STATUS="UNKNOWN"
           if [ "$VERDICT" = "BLOCKING" ]; then EMOJI="🚨"; STATUS="**BLOCKING**"; fi
@@ -114,26 +121,33 @@ jobs:
           $(cat clean_report.md)
           
           ---
-          ### 📦 Supply Chain Information (SBOM)
+          ### Supply Chain Information (SBOM)
           - **Components detected:** ${{ steps.static_gate.outputs.components }}
           - **CVEs found (Trivy):** ${{ steps.static_gate.outputs.cves }}
           - **Standards:** SPDX 2.3, CycloneDX 1.6
           
           <details>
-          <summary>📋 Component Preview (Top 10)</summary>
+          <summary> Component Preview (Top 10)</summary>
 
           ${{ steps.static_gate.outputs.top10 }}
 
           </details>
 
-          <sub>🤖 Report ID: \`${{ github.run_id }}\`</sub>
+          <sub> Report ID: \`${{ github.run_id }}\`</sub>
           EOF
           
           gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md --repo ${{ github.repository }}
 
+      # Final step to fail the build if policy is BLOCKING
       - name: Final Verdict
-        if: steps.static_gate.outputs.verdict == 'BLOCKING'
+        if: always()
         run: |
-          echo "FAIL: Blocking security issues or policy violations found."
-          exit 1
+          if [ "${{ steps.static_gate.outputs.verdict }}" = "BLOCKING" ]; then
+            echo "❌ FAIL: Blocking security issues or policy violations found."
+            exit 1
+          fi
+          
+          # Clean up generated files so they don't get committed by accident 
+          # (though GitHub checkout usually cleans up anyway)
+          rm -f sbom*.json raw_report.txt clean_report.md pr_comment.md
           
