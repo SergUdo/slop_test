@@ -37,7 +37,7 @@ jobs:
           path: ~/.cache/ai-slop-gate
           key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', 'policy.yml') }}
 
-      - name: Run Static Analysis
+      - name: Run Gemini Analysis
         id: gemini_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,7 +56,7 @@ jobs:
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
-            -e GEMINI_API_KEY \
+            -e SGEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
             run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
           
