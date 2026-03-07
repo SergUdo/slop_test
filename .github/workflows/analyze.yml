@@ -139,7 +139,6 @@ jobs:
           
           gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md --repo ${{ github.repository }}
 
-      # Final step to fail the build if policy is BLOCKING
       - name: Final Verdict
         if: always()
         run: |
