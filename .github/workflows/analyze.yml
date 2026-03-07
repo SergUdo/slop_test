@@ -1,4 +1,4 @@
-name: AI Slop Gate Gemini Analysis
+name: AI Slop Gate Static Analysis
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  gemini-analysis:
+  static-analysis:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -37,11 +37,10 @@ jobs:
           path: ~/.cache/ai-slop-gate
           key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', 'policy.yml') }}
 
-      - name: Run Gemini Analysis
-        id: gemini_gate
+      - name: Run Static Analysis
+        id: static_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
         run: |
           mkdir -p ~/.cache/ai-slop-gate
           
@@ -50,17 +49,17 @@ jobs:
             POLICY_FLAG="--policy /data/policy.yml"
           fi
           
-          run: |
+          # FIX: Running as root to avoid "Permission Denied" on /data mount
+          # The files created here (sbom.json etc) will live on the runner's disk
           docker run --rm \
             --user root \
             -v "${{ github.workspace }}:/data" \
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
-            -e GEMINI_API_KEY \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
-                  
-            cat raw_report.txt
+            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
+          
+          cat raw_report.txt
           
           # Parse outputs for the PR comment
           VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}' || echo "UNKNOWN")
@@ -102,8 +101,8 @@ jobs:
             echo "⚠️ No report found in logs" > clean_report.md
           fi
           
-          VERDICT="${{ steps.gemini_gate.outputs.verdict }}"
-          FINDINGS="${{ steps.gemini_gate.outputs.findings }}"
+          VERDICT="${{ steps.static_gate.outputs.verdict }}"
+          FINDINGS="${{ steps.static_gate.outputs.findings }}"
           
           # Determine Emoji and Status label
           EMOJI="❓"
@@ -123,14 +122,14 @@ jobs:
           
           ---
           ### Supply Chain Information (SBOM)
-          - **Components detected:** ${{ steps.gemini_gate.outputs.components }}
-          - **CVEs found (Trivy):** ${{ steps.gemini_gate.outputs.cves }}
+          - **Components detected:** ${{ steps.static_gate.outputs.components }}
+          - **CVEs found (Trivy):** ${{ steps.static_gate.outputs.cves }}
           - **Standards:** SPDX 2.3, CycloneDX 1.6
           
           <details>
           <summary> Component Preview (Top 10)</summary>
 
-          ${{ steps.gemini_gate.outputs.top10 }}
+          ${{ steps.static_gate.outputs.top10 }}
 
           </details>
 
@@ -139,10 +138,11 @@ jobs:
           
           gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md --repo ${{ github.repository }}
 
+      # Final step to fail the build if policy is BLOCKING
       - name: Final Verdict
         if: always()
         run: |
-          if [ "${{ steps.gemini_gate.outputs.verdict }}" = "BLOCKING" ]; then
+          if [ "${{ steps.static_gate.outputs.verdict }}" = "BLOCKING" ]; then
             echo "❌ FAIL: Blocking security issues or policy violations found."
             exit 1
           fi
