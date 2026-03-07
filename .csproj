@@ -1,0 +1,4 @@
+<ItemGroup>
+  <PackageReference Include="Newtonsoft.Json" Version="1.0.0" />
+  <PackageReference Include="System.Text.Encodings.Web" Version="4.0.0" />
+</ItemGroup>
