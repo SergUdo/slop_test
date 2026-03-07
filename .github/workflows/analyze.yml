@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  static-analysis:
+  gemini-analysis:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -38,7 +38,7 @@ jobs:
           key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', 'policy.yml') }}
 
       - name: Run Static Analysis
-        id: static_gate
+        id: gemini_gate
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -57,7 +57,7 @@ jobs:
             -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
             -e GITHUB_TOKEN \
             ghcr.io/sergudo/ai-slop-gate:latest \
-            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
+            run --provider gemini --llm-local $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
           
           cat raw_report.txt
           
@@ -101,8 +101,8 @@ jobs:
             echo "⚠️ No report found in logs" > clean_report.md
           fi
           
-          VERDICT="${{ steps.static_gate.outputs.verdict }}"
-          FINDINGS="${{ steps.static_gate.outputs.findings }}"
+          VERDICT="${{ steps.gemini_gate.outputs.verdict }}"
+          FINDINGS="${{ steps.gemini_gate.outputs.findings }}"
           
           # Determine Emoji and Status label
           EMOJI="❓"
@@ -122,14 +122,14 @@ jobs:
           
           ---
           ### Supply Chain Information (SBOM)
-          - **Components detected:** ${{ steps.static_gate.outputs.components }}
-          - **CVEs found (Trivy):** ${{ steps.static_gate.outputs.cves }}
+          - **Components detected:** ${{ steps.gemini_gate.outputs.components }}
+          - **CVEs found (Trivy):** ${{ steps.gemini_gate.outputs.cves }}
           - **Standards:** SPDX 2.3, CycloneDX 1.6
           
           <details>
           <summary> Component Preview (Top 10)</summary>
 
-          ${{ steps.static_gate.outputs.top10 }}
+          ${{ steps.gemini_gate.outputs.top10 }}
 
           </details>
 
@@ -142,7 +142,7 @@ jobs:
       - name: Final Verdict
         if: always()
         run: |
-          if [ "${{ steps.static_gate.outputs.verdict }}" = "BLOCKING" ]; then
+          if [ "${{ steps.gemini_gate.outputs.verdict }}" = "BLOCKING" ]; then
             echo "❌ FAIL: Blocking security issues or policy violations found."
             exit 1
           fi
