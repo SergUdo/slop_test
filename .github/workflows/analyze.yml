@@ -253,10 +253,8 @@ jobs:
           <details>
           <summary>⬇️ How to download SBOM</summary>
 
-          1. Click **Details** on this check
-          2. Scroll to **Artifacts** section
-          3. Download \`sbom-reports-${{ github.run_number }}.zip\`
-
+          **[⬇️ Download SBOM artifacts](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})**
+          
           </details>
 
           EOF
@@ -278,4 +276,3 @@ jobs:
         run: |
           echo "❌ Static analysis found blocking violations"
           exit 1
-          
