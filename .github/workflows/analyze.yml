@@ -118,6 +118,7 @@ jobs:
           if [ "$OUT_VERDICT" = "BLOCKING" ]; then EMOJI="🚨"; STATUS="BLOCKING"; fi
           if [ "$OUT_VERDICT" = "ADVISORY" ]; then EMOJI="⚠️"; STATUS="ADVISORY"; fi
           if [ "$OUT_VERDICT" = "ALLOW" ];    then EMOJI="✅"; STATUS="PASSED"; fi
+          export EMOJI STATUS
 
           python3 -c "
           import os, textwrap
@@ -172,4 +173,3 @@ jobs:
             echo "FAIL: Blocking security issues or policy violations found."
             exit 1
           fi
-          
