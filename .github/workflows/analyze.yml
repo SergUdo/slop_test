@@ -1,0 +1,153 @@
+name: AI Slop Gate Static Analysis
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Restore dependencies to allow Syft/Trivy to see full metadata
+      - name: Restore dependencies
+        run: |
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt --quiet || true
+          fi
+          if [ -f "package-lock.json" ]; then
+            npm ci --quiet || true
+          fi
+          echo "✅ Dependency restore complete"
+
+      - name: Cache ai-slop-gate data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ai-slop-gate
+          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', 'policy.yml') }}
+
+      - name: Run Static Analysis
+        id: static_gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ~/.cache/ai-slop-gate
+          
+          POLICY_FLAG=""
+          if [ -f "policy.yml" ]; then
+            POLICY_FLAG="--policy /data/policy.yml"
+          fi
+          
+          # FIX: Running as root to avoid "Permission Denied" on /data mount
+          # The files created here (sbom.json etc) will live on the runner's disk
+          docker run --rm \
+            --user root \
+            -v "${{ github.workspace }}:/data" \
+            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
+            -e GITHUB_TOKEN \
+            ghcr.io/sergudo/ai-slop-gate:latest \
+            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
+          
+          cat raw_report.txt
+          
+          # Parse outputs for the PR comment
+          VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}' || echo "UNKNOWN")
+          FINDINGS=$(grep "Total findings:" raw_report.txt | awk '{print $NF}' || echo "0")
+          COMP_COUNT=$(grep "Generated SBOM with" raw_report.txt | sed -E 's/.*with ([0-9]+) dependencies.*/\1/' | head -1 || echo "0")
+          CVE_COUNT=$(grep "Trivy Scan Complete. Found" raw_report.txt | sed -E 's/.*Found ([0-9]+) vulnerabilities.*/\1/' | head -1 || echo "0")
+          
+          # Extract top 10 components for PR visibility
+          if [ -f "sbom.json" ]; then
+             TOP10=$(jq -r '.artifacts[:10] | .[] | "- \(.name) (\(.version))"' sbom.json | sed 's/$/\\n/' | tr -d '\n')
+          else
+             TOP10="No components found."
+          fi
+
+          echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
+          echo "findings=$FINDINGS" >> $GITHUB_OUTPUT
+          echo "components=$COMP_COUNT" >> $GITHUB_OUTPUT
+          echo "cves=$CVE_COUNT" >> $GITHUB_OUTPUT
+          echo "top10=$TOP10" >> $GITHUB_OUTPUT
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-reports-${{ github.run_number }}
+          path: |
+            sbom*.json
+          retention-days: 90
+
+      - name: Post PR Report
+        if: github.event_name == 'pull_request' && always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Extract the formatted report from logs
+          sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
+          
+          if [ ! -s clean_report.md ]; then
+            echo "⚠️ No report found in logs" > clean_report.md
+          fi
+          
+          VERDICT="${{ steps.static_gate.outputs.verdict }}"
+          FINDINGS="${{ steps.static_gate.outputs.findings }}"
+          
+          # Determine Emoji and Status label
+          EMOJI="❓"
+          STATUS="UNKNOWN"
+          if [ "$VERDICT" = "BLOCKING" ]; then EMOJI="🚨"; STATUS="**BLOCKING**"; fi
+          if [ "$VERDICT" = "ADVISORY" ]; then EMOJI="⚠️"; STATUS="**ADVISORY**"; fi
+          if [ "$VERDICT" = "ALLOW" ]; then EMOJI="✅"; STATUS="**PASSED**"; fi
+          
+          cat > pr_comment.md << EOF
+          ## $EMOJI AI Slop Gate Analysis
+          
+          **Status:** $STATUS
+          **Findings:** $FINDINGS issue(s) detected
+          
+          ---
+          $(cat clean_report.md)
+          
+          ---
+          ### Supply Chain Information (SBOM)
+          - **Components detected:** ${{ steps.static_gate.outputs.components }}
+          - **CVEs found (Trivy):** ${{ steps.static_gate.outputs.cves }}
+          - **Standards:** SPDX 2.3, CycloneDX 1.6
+          
+          <details>
+          <summary> Component Preview (Top 10)</summary>
+
+          ${{ steps.static_gate.outputs.top10 }}
+
+          </details>
+
+          <sub> Report ID: \`${{ github.run_id }}\`</sub>
+          EOF
+          
+          gh pr comment ${{ github.event.pull_request.number }} --body-file pr_comment.md --repo ${{ github.repository }}
+
+      # Final step to fail the build if policy is BLOCKING
+      - name: Final Verdict
+        if: always()
+        run: |
+          if [ "${{ steps.static_gate.outputs.verdict }}" = "BLOCKING" ]; then
+            echo "❌ FAIL: Blocking security issues or policy violations found."
+            exit 1
+          fi
+          
+          # Clean up generated files so they don't get committed by accident 
+          # (though GitHub checkout usually cleans up anyway)
+          rm -f sbom*.json raw_report.txt clean_report.md pr_comment.md
+          
