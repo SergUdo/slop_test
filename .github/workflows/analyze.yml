@@ -90,15 +90,16 @@ jobs:
           retention-days: 90
 
       - name: Post PR Report
-        if: always() && github.event.pull_request.number != ''
+        if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Extract the formatted report from logs
-          sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
+          # Find PR number associated with this commit
+          PR_NUMBER=$(gh pr list --state open --head "${{ github.ref_name }}" --json number --jq '.[0].number' 2>/dev/null || echo "")
           
-          if [ ! -s clean_report.md ]; then
-            echo "⚠️ No report found in logs" > clean_report.md
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for this branch, skipping comment."
+            exit 0
           fi
           
           VERDICT="${{ steps.static_gate.outputs.verdict }}"
