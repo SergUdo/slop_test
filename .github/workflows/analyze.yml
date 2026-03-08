@@ -2,9 +2,9 @@ name: AI Slop Gate Static Analysis
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ slop_k8s ]
   push:
-    branches: [ main ]
+    branches: [ slop_k8s ]
   workflow_dispatch:
 
 permissions:
