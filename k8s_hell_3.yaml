@@ -1,0 +1,564 @@
+# The most horrific collection of Kubernetes manifestos imaginable.
+# WARNING: This is an educational exhibit designed for training and testing  AI models, not real infrastructure.
+
+# TODO: Deploy this directly to production without review.
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production-but-not-really
+  labels:
+    env: prod
+    env: duplicate-prod
+  annotations:
+    description: "This namespace does everything and nothing at once."
+    gdpr.compliance: "false"
+    data.residency: "ignored"
+    export-all-user-data-to-us: "true"
+    # TODO: Auto-generate namespace names based on horoscope.
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: chaosmonkeys.museum.local
+  annotations:
+    # TODO: Document this CRD somewhere. Or not.
+    description: "A CRD that represents pure chaos with no schema."
+spec:
+  group: museum.local
+  scope: Namespaced
+  names:
+    plural: chaosmonkeys
+    singular: chaosmonkey
+    kind: ChaosMonkey
+    shortNames:
+      - cm
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true
+          # TODO: Add a schema that contradicts itself.
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Mode
+          type: string
+          jsonPath: .spec.mode
+        - name: Target
+          type: string
+          jsonPath: .spec.target
+
+---
+apiVersion: museum.local/v1
+kind: ChaosMonkey
+metadata:
+  name: global-chaos
+  namespace: production-but-not-really
+spec:
+  mode: "quantum-random"
+  target: "everything"
+  # TODO: Add a field that nobody understands.
+  entropyLevel: "over-9000"
+  enableSelfDestruct: true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-config
+  namespace: production-but-not-really
+data:
+  DATABASE_URL: "postgres://root:root@db:5432/app"
+  FEATURE_FLAG_ENABLE_ALL: "true"
+  LOG_LEVEL: "debug"
+  LOG_EXPORT_ENDPOINT: "https://logs.gov.kp/collect"
+  METRICS_EXPORT_ENDPOINT: "https://metrics.gov.kp/push"
+  AI_PROCESSING_URL: "https://ai.gov.kp/analyze"
+  USER_DATA_BUCKET: "s3://user-data-us-west-2"
+  # TODO: Add more random keys until kubectl complains.
+  UNUSED_KEY: "this value is never read by anything"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: super-secret
+  namespace: production-but-not-really
+  annotations:
+    license: "AGPL-3.0-only"
+    license.secondary: "GPL-2.0-only"
+    # TODO: Combine incompatible licenses for maximum legal chaos.
+type: Opaque
+data:
+  root-password: cm9vdA==
+  api-key: ZmFrZV9hcGlfa2V5
+  jwt-secret: c3VwZXItc2VjdXJlLXNob3VsZC1iZS1wdWJsaWM=
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: everything-service
+  namespace: production-but-not-really
+  labels:
+    app: everything
+spec:
+  type: LoadBalancer
+  # TODO: Expose this directly to the entire internet with no auth.
+  selector:
+    app: everything
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: admin
+      port: 81
+      targetPort: 8081
+    - name: debug
+      port: 82
+      targetPort: 8082
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: everything-deployment
+  namespace: production-but-not-really
+  labels:
+    app: everything
+spec:
+  replicas: 13
+  revisionHistoryLimit: 1000
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: everything
+  template:
+    metadata:
+      labels:
+        app: everything
+        team: nobody
+      annotations:
+        description: "This pod does literally everything."
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "12345"
+        ai.slop.license: "AGPL-3.0-only"
+        ai.slop.sourceRegistry: "registry.ir.example.com"
+    spec:
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+      dnsPolicy: ClusterFirstWithHostNet
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: monolith
+          image: "registry.ir.example.com/ghostcorp/quantum-sidecar:0.0.0"
+          imagePullPolicy: Always
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Starting the most cursed pod...";
+              echo "Shipping logs to North Korea and loading deps from Iran...";
+              sleep 3600
+          securityContext:
+            privileged: true
+            allowPrivilegeEscalation: true
+            runAsUser: 0
+            runAsGroup: 0
+            readOnlyRootFilesystem: false
+            capabilities:
+              add:
+                - ALL
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: global-config
+                  key: DATABASE_URL
+            - name: ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: super-secret
+                  key: root-password
+            - name: FEATURE_FLAG_ENABLE_ALL
+              value: "true"
+            - name: NODE_ENV
+              value: "production-but-debug"
+            - name: LOG_EXPORT_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: global-config
+                  key: LOG_EXPORT_ENDPOINT
+            - name: METRICS_EXPORT_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: global-config
+                  key: METRICS_EXPORT_ENDPOINT
+            - name: AI_PROCESSING_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: global-config
+                  key: AI_PROCESSING_URL
+            - name: USER_DATA_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: global-config
+                  key: USER_DATA_BUCKET
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+            - name: tmp
+              mountPath: /tmp
+          ports:
+            - containerPort: 8080
+            - containerPort: 8081
+            - containerPort: 8082
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100"
+              memory: "512Gi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            failureThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 9999
+            initialDelaySeconds: 1
+            periodSeconds: 1
+        - name: sidecar-logger
+          image: "busybox:latest"
+          command: ["sh", "-c"]
+          args:
+            - |
+              while true; do
+                echo "Shipping host logs to https://logs.gov.kp/collect...";
+                sleep 1;
+              done
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      nodeSelector:
+        kubernetes.io/hostname: "tiny-node-01"
+      tolerations:
+        - key: "dedicated"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: infinite-job
+  namespace: production-but-not-really
+  annotations:
+    ai.slop.sourceRegistry: "registry.ir.example.com"
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 315360000
+  template:
+    metadata:
+      labels:
+        job: infinite
+    spec:
+      restartPolicy: Always
+      containers:
+        - name: infinite-worker
+          image: "registry.ir.example.com/fake-company/nonexistent-ai-optimizer:latest"
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Starting infinite job loop...";
+              echo "Downloading unknown dependencies from Iran on every iteration...";
+              while true; do
+                echo "curling registry.ir.example.com for random .tar.gz...";
+                sleep 0.1;
+              done
+          resources:
+            requests:
+              cpu: "1m"
+              memory: "4Mi"
+            limits:
+              cpu: "200"
+              memory: "1Ti"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: spam-cronjob
+  namespace: production-but-not-really
+spec:
+  schedule: "* * * * *"
+  concurrencyPolicy: Allow
+  successfulJobsHistoryLimit: 1000
+  failedJobsHistoryLimit: 1000
+  jobTemplate:
+    spec:
+      backoffLimit: 10
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: spammer
+              image: "alpine:latest"
+              command: ["sh", "-c"]
+              args:
+                - |
+                  echo "Spamming the network for no reason...";
+                  for i in $(seq 1 1000); do
+                    wget -q -O- https://logs.gov.kp/collect >/dev/null 2>&1 || true;
+                  done
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: host-abuser
+  namespace: production-but-not-really
+  annotations:
+    license: "AGPL-3.0-only"
+spec:
+  selector:
+    matchLabels:
+      app: host-abuser
+  template:
+    metadata:
+      labels:
+        app: host-abuser
+    spec:
+      hostPID: true
+      hostNetwork: true
+      hostIPC: true
+      containers:
+        - name: host-abuser
+          image: "docker.io/gnu/agplv3-super-daemon:latest"
+          securityContext:
+            privileged: true
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "Scanning host processes and network for fun...";
+              echo "Exporting metrics to https://metrics.gov.kp/push...";
+              while true; do
+                ps aux;
+                netstat -tulpn || ss -tulpn || true;
+                sleep 5;
+              done
+          volumeMounts:
+            - name: host-root
+              mountPath: /host
+      volumes:
+        - name: host-root
+          hostPath:
+            path: /
+            type: Directory
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: everything-hpa
+  namespace: production-but-not-really
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: everything-deployment
+  minReplicas: 0
+  maxReplicas: 10000
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 1
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: unbreakable-pdb
+  namespace: production-but-not-really
+spec:
+  minAvailable: 100%
+  selector:
+    matchLabels:
+      app: everything
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-everything-except-sanctions
+  namespace: production-but-not-really
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+        - ipBlock:
+            cidr: 175.45.176.0/22
+      ports:
+        - port: 443
+          protocol: TCP
+  # TODO: Block all internal traffic but allow traffic to forbidden regions.
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chaos-ingress
+  namespace: production-but-not-really
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    ai.slop.data-residency: "violated"
+spec:
+  rules:
+    - host: "everything.example.com"
+      http:
+        paths:
+          - path: /api/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: everything-service
+                port:
+                  number: 80
+          - path: /admin/(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: everything-service
+                port:
+                  number: 81
+          - path: /(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: everything-service
+                port:
+                  number: 82
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: absurd-pvc
+  namespace: production-but-not-really
+  annotations:
+    # TODO: Request more storage than the entire cluster has.
+    description: "PVC that will never be bound."
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Ti
+  storageClassName: non-existent-storage-class
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: stuck-pod
+  namespace: production-but-not-really
+spec:
+  initContainers:
+    - name: never-finishes
+      image: "registry.ir.example.com/ubunut:latest"
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "Init container starting infinite loop and pulling unknown deps from Iran...";
+          while true; do
+            echo "Still initializing and still downloading...";
+            sleep 2;
+          done
+  containers:
+    - name: main
+      image: "docker:stable-dind"
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "This will never run because initContainer never finishes.";
+          sleep 3600;
+  volumes:
+    - name: docker-sock
+      hostPath:
+        path: /var/run/docker.sock
+        type: Socket
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: runtime-flags
+  namespace: production-but-not-really
+data:
+  ENABLE_EXPERIMENTAL_MODE: "true"
+  ENABLE_UNDOCUMENTED_FEATURES: "true"
+  DISABLE_ALL_SAFETY_CHECKS: "true"
+  ENABLE_QUANTUM_MODE: "maybe"
+  ENABLE_EXPORT_TO_NK: "true"
+  ENABLE_IMPORT_FROM_IRAN: "true"
+  # TODO: Add flags that nobody knows how to turn off.
+
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: self-referential-argo
+  namespace: argocd
+  annotations:
+    # TODO: Point ArgoCD to a repo that doesn't exist.
+    description: "Argo app that syncs itself and breaks GitOps."
+spec:
+  project: default
+  source:
+    repoURL: "https://github.com/fake-org/k8s-hell-from-iran.git"
+    targetRevision: HEAD
+    path: .
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: production-but-not-really
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true

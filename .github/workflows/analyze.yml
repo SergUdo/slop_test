@@ -1,0 +1,175 @@
+name: AI Slop Gate Static Analysis
+
+on:
+  pull_request:
+    branches: [ slop_k8s ]
+  push:
+    branches: [ slop_k8s ]
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  static-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Restore dependencies
+        run: |
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt --quiet || true
+          fi
+          if [ -f "package-lock.json" ]; then
+            npm ci --quiet || true
+          fi
+          echo "Dependency restore complete"
+
+      - name: Cache ai-slop-gate data
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ai-slop-gate
+          key: ai-slop-gate-cache-${{ runner.os }}-${{ hashFiles('**/*.py', 'policy.yml') }}
+
+      - name: Run Static Analysis
+        id: static_gate
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p ~/.cache/ai-slop-gate
+
+          POLICY_FLAG=""
+          if [ -f "policy.yml" ]; then
+            POLICY_FLAG="--policy /data/policy.yml"
+          fi
+
+          docker run --rm \
+            --user root \
+            -v "${{ github.workspace }}:/data" \
+            -v ~/.cache/ai-slop-gate:/root/.cache/ai-slop-gate \
+            -e GITHUB_TOKEN \
+            ghcr.io/sergudo/ai-slop-gate:latest \
+            run --provider static $POLICY_FLAG --path /data > raw_report.txt 2>&1 || true
+
+          cat raw_report.txt
+
+          VERDICT=$(grep "Policy Verdict:" raw_report.txt | awk '{print $NF}' || echo "UNKNOWN")
+          FINDINGS=$(grep "Total findings:" raw_report.txt | awk '{print $NF}' || echo "0")
+          COMP_COUNT=$(grep "Generated SBOM with" raw_report.txt | sed -E 's/.*with ([0-9]+) dependencies.*/\1/' | head -1 || echo "0")
+          CVE_COUNT=$(grep "Trivy Scan Complete. Found" raw_report.txt | sed -E 's/.*Found ([0-9]+) vulnerabilities.*/\1/' | head -1 || echo "0")
+
+          if [ -f "sbom.json" ]; then
+            TOP10=$(jq -r '.artifacts[:10] | .[] | "- \(.name) (\(.version))"' sbom.json 2>/dev/null || echo "No components found.")
+          else
+            TOP10="No components found."
+          fi
+
+          echo "verdict=$VERDICT" >> $GITHUB_OUTPUT
+          echo "findings=$FINDINGS" >> $GITHUB_OUTPUT
+          echo "components=$COMP_COUNT" >> $GITHUB_OUTPUT
+          echo "cves=$CVE_COUNT" >> $GITHUB_OUTPUT
+          {
+            echo "top10<<EOF"
+            echo "$TOP10"
+            echo "EOF"
+          } >> $GITHUB_OUTPUT
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sbom-reports-${{ github.run_number }}
+          path: |
+            sbom*.json
+          retention-days: 90
+
+      - name: Post PR Report
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          OUT_VERDICT: ${{ steps.static_gate.outputs.verdict }}
+          OUT_FINDINGS: ${{ steps.static_gate.outputs.findings }}
+          OUT_COMPONENTS: ${{ steps.static_gate.outputs.components }}
+          OUT_CVES: ${{ steps.static_gate.outputs.cves }}
+          OUT_TOP10: ${{ steps.static_gate.outputs.top10 }}
+        run: |
+          PR_NUMBER=$(gh pr list --state open --head "$BRANCH_NAME" --json number --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for branch $BRANCH_NAME, skipping comment."
+            exit 0
+          fi
+
+          sed -n '/=== AI SLOP GATE REPORT ===/,/=== END OF REPORT ===/p' raw_report.txt > clean_report.md
+          if [ ! -s clean_report.md ]; then
+            echo "No report found in logs" > clean_report.md
+          fi
+
+          EMOJI="?"
+          STATUS="UNKNOWN"
+          if [ "$OUT_VERDICT" = "BLOCKING" ]; then EMOJI="🚨"; STATUS="BLOCKING"; fi
+          if [ "$OUT_VERDICT" = "ADVISORY" ]; then EMOJI="⚠️"; STATUS="ADVISORY"; fi
+          if [ "$OUT_VERDICT" = "ALLOW" ];    then EMOJI="✅"; STATUS="PASSED"; fi
+          export EMOJI STATUS
+
+          python3 -c "
+          import os, textwrap
+          emoji      = os.environ['EMOJI']
+          status     = os.environ['STATUS']
+          findings   = os.environ['OUT_FINDINGS']
+          components = os.environ['OUT_COMPONENTS']
+          cves       = os.environ['OUT_CVES']
+          top10      = os.environ['OUT_TOP10']
+          run_id     = os.environ['RUN_ID']
+          with open('clean_report.md') as f:
+              report = f.read().strip()
+          body = textwrap.dedent(f'''
+              ## {emoji} AI Slop Gate Analysis
+
+              **Status:** {status}
+              **Findings:** {findings} issue(s) detected
+
+              <hr>
+
+              {report}
+
+              <hr>
+
+              ### Supply Chain Information (SBOM)
+
+              - **Components detected:** {components}
+              - **CVEs found (Trivy):** {cves}
+              - **Standards:** SPDX 2.3, CycloneDX 1.6
+
+              <details>
+              <summary>Component Preview (Top 10)</summary>
+
+              {top10}
+
+              </details>
+
+              <sub>Report ID: \`{run_id}\`</sub>
+          ''').lstrip()
+          with open('pr_comment.md', 'w') as f:
+              f.write(body)
+          "
+
+          gh pr comment "$PR_NUMBER" --body-file pr_comment.md --repo "$REPO"
+
+      - name: Final Verdict
+        if: always()
+        run: |
+          rm -f sbom*.json raw_report.txt clean_report.md pr_comment.md
+
+          if [ "${{ steps.static_gate.outputs.verdict }}" = "BLOCKING" ]; then
+            echo "FAIL: Blocking security issues or policy violations found."
+            exit 1
+          fi
